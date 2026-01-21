@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Rust
+/target
+**/*.rs.bk
+debug/
+
+# Virtual Environments
+.env
+.venv
+.venv_prod
+.venv_std
+.venv_test
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing and Quality
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.tox/
+
+# IDE and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# DiffPrimer specific outputs
+diffprimer_results.csv
+*.log

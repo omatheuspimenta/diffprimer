@@ -1,0 +1,36 @@
+[project]
+name = "diffprimer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Matheus Pimenta", email = "omatheuspimenta@outlook.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "gffpandas>=1.2.0",
+    "pandas>=2.3.3",
+    "primer3-py>=2.3.0",
+    "rich>=14.2.0",
+    "typer>=0.20.0",
+]
+
+[project.scripts]
+diffprimer = "diffprimer.cli:app"
+
+[tool.maturin]
+module-name = "diffprimer.kmer_extractor"
+python-packages = ["diffprimer"]
+python-source = "src"
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.rs" }, { file = "Cargo.toml" }, { file = "Cargo.lock" }]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
