@@ -5,6 +5,12 @@ from diffprimer.logs import diffprimerLog, _make_progress
 import os
 import multiprocessing
 from functools import partial
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.columns import Columns
+from rich import box
+
 
 import warnings
 
@@ -12,7 +18,7 @@ import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*global interpreter lock.*")
 
 logger = diffprimerLog()
-
+console = Console()
 
    
 # Wrapper for parallel processing
@@ -63,8 +69,65 @@ def main(
     reference_max_abundance: int = 1,
     check_specificity: bool = False,
     similarity_threshold: float = 80.0,
-) -> None:
+) -> None:    
+    input_table = Table(show_header=False, box=None, padding=(0, 2))
+    input_table.add_column("Parameter", style="bold cyan")
+    input_table.add_column("Value", style="white")
+
+    input_table.add_row("Reference File", str(reference_file))
+    input_table.add_row("Sequences Path", str(sequences_path))
+    input_table.add_row("Annotation File", str(annotation_path))
+    input_table.add_row("Configuration File", str(config_file))
+    input_table.add_row("k-mer Size", str(k))
+    input_table.add_row("Min Region Length", str(min_region_length))
+    input_table.add_row("Ref Max Abundance", str(reference_max_abundance))
+    input_table.add_row("Check Specificity", str(check_specificity))
+
+    if check_specificity:
+        input_table.add_row("Similarity Threshold", str(similarity_threshold))
+
+    console.print(Panel(
+        input_table, 
+        title="[bold green]DiffPrimer Settings[/bold green]", 
+        border_style="green",
+        expand=False
+    ))
+    
+    # --- 2. Create a 4-Column Table for Primer3 Args ---
+    # We use 4 columns to create the visual effect of "Two Columns of Data"
+    p3_table = Table(
+        show_header=True, 
+        header_style="bold blue", 
+        box=box.SIMPLE_HEAD,
+        expand=True
+    )
+    p3_table.add_column("Parameter", style="dim")
+    p3_table.add_column("Value", style="yellow")
+    p3_table.add_column("Parameter", style="dim")
+    p3_table.add_column("Value", style="yellow")
+    
     global_args = load_config(config_file)
+    # Logic to split dictionary into pairs for the table
+    items = list(global_args.items())
+    for i in range(0, len(items), 2):
+        key1, val1 = items[i]
+        # Check if there is a second item in this pair
+        if i + 1 < len(items):
+            key2, val2 = items[i+1]
+            p3_table.add_row(key1, str(val1), key2, str(val2))
+        else:
+            # If odd number of items, leave the right side empty
+            p3_table.add_row(key1, str(val1), "", "")
+
+    # --- 3. Print Everything ---
+    
+
+    console.print(Panel(
+        p3_table, 
+        title="[bold blue]Primer3 Global Arguments[/bold blue]", 
+        border_style="blue",
+        expand=False
+    ))
     
     if cpus is None:
         detected = os.cpu_count()
