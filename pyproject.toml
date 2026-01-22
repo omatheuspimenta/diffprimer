@@ -1,7 +1,7 @@
 [project]
 name = "diffprimer"
 version = "0.1.0"
-description = "Add your description here"
+description = "A tool to design primers that target specific variants in genomic sequences. Alingment-free and fast."
 readme = "README.md"
 authors = [
     { name = "Matheus Pimenta", email = "omatheuspimenta@outlook.com" }
@@ -32,5 +32,6 @@ build-backend = "maturin"
 
 [dependency-groups]
 dev = [
+    "maturin>=1.11.5",
     "pytest>=9.0.2",
 ]

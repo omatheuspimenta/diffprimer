@@ -244,8 +244,8 @@ def main(
         sim_threshold = similarity_threshold 
         
         try:
-            from diffprimer.kmer_extractor import check_specificity
-            specificity_results = check_specificity(
+            from diffprimer.kmer_extractor import check_specificity as _check_specificity
+            specificity_results = _check_specificity(
                 candidates=candidates,
                 sequences_dir=sequences_path,
                 similarity_threshold=sim_threshold,
