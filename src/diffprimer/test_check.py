@@ -1,3 +1,9 @@
+"""
+Test script for verifying k-mer extraction and primer specificity checks.
+
+This script runs the core Rust components of the pipeline to ensure they are working correctly,
+using a hardcoded set of test data.
+"""
 from diffprimer.kmer_extractor import process_seqs, check_specificity, PrimerCandidate
 
 print("Step 1: Processing sequences to find unique regions...")

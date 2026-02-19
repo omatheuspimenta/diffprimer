@@ -18,18 +18,29 @@ const C: u64 = 0b01;
 const G: u64 = 0b10;
 const T: u64 = 0b11;
 
+/// A struct representing a k-mer (substring of length k) encoded as a 2-bit integer.
 #[derive(Clone, Copy, Debug)]
 struct Kmer {
+    /// The 2-bit encoded value of the k-mer.
     value: u64,
+    /// The length of the k-mer.
     k: usize,
 }
 
 impl Kmer {
+    /// Creates a new empty Kmer.
+    ///
+    /// # Arguments
+    ///
+    /// * `k` - The size of the k-mer. Must be <= 31.
     fn new(k: usize) -> Self {
         assert!(k <= 31, "k must be <= 31 for u64 representation");
         Kmer { value: 0, k }
     }
 
+    /// Pushes a new base into the k-mer, shifting the previous value.
+    ///
+    /// Returns `Some(())` if the base is valid (A, C, G, T), or `None` otherwise.
     fn push(&mut self, base: u8) -> Option<()> {
         let encoded = match base.to_ascii_uppercase() {
             b'A' => A,
@@ -44,6 +55,7 @@ impl Kmer {
         Some(())
     }
 
+    /// Returns the k-mer value as a u64 integer.
     fn as_u64(&self) -> u64 {
         self.value
     }
@@ -51,12 +63,14 @@ impl Kmer {
 
 // Enhanced FASTA reader for multi-FASTA files
 // Enhanced FASTA reader for multi-FASTA files
+/// A buffered reader for efficiently processing multi-FASTA files.
 struct MultiFastaReader {
     reader: BufReader<File>,
     line_buffer: String,
 }
 
 impl MultiFastaReader {
+    /// Creates a new MultiFastaReader for the given file path.
     fn new(path: &Path) -> std::io::Result<Self> {
         let file = File::open(path)?;
         Ok(MultiFastaReader {
@@ -135,6 +149,14 @@ impl Iterator for MultiFastaReader {
 
 // Updated k-mer extraction function that handles multifasta files
 // Updated k-mer extraction function that handles multifasta files (using iterator)
+/// Extracts unique k-mers from a FASTA file.
+///
+/// Reads the file efficiently using `MultiFastaReader` and returns a set of unique k-mer hash values.
+///
+/// # Arguments
+///
+/// * `path` - Path to the FASTA file.
+/// * `k` - The k-mer size.
 fn extract_kmers_from_sequence(path: &Path, k: usize) -> std::io::Result<FxHashSet<u64>> {
     let mut kmers = FxHashSet::default();
     let reader = MultiFastaReader::new(path)?;
@@ -163,6 +185,12 @@ fn extract_kmers_from_sequence(path: &Path, k: usize) -> std::io::Result<FxHashS
     Ok(kmers)
 }
 
+/// Counts k-mer occurrences in a reference FASTA file.
+///
+/// # Arguments
+///
+/// * `path` - Path to the reference FASTA file.
+/// * `k` - The k-mer size.
 fn count_kmers_from_reference(path: &Path, k: usize) -> std::io::Result<FxHashMap<u64, u32>> {
     let mut kmer_counts = FxHashMap::default();
     let reader = MultiFastaReader::new(path)?;
@@ -188,6 +216,22 @@ fn count_kmers_from_reference(path: &Path, k: usize) -> std::io::Result<FxHashMa
     Ok(kmer_counts)
 }
 
+/// Identifies k-mers that are exclusive to the reference genome.
+///
+/// This function computes the set of k-mers present in the reference genome (with abundance <= `max_abundance`)
+/// and removes any k-mers found in other sequence files in `sequences_dir`.
+///
+/// # Arguments
+///
+/// * `reference_path` - Path to the reference FASTA file.
+/// * `sequences_dir` - Directory containing other FASTA files to compare against.
+/// * `k` - The k-mer size.
+/// * `num_threads` - Number of threads for parallel processing.
+/// * `max_abundance` - Maximum allowed abundance in the reference for a k-mer to be considered.
+///
+/// # Returns
+///
+/// A `Result` containing a `HashSet` of exclusive k-mers.
 pub fn get_exclusive_kmers(
     reference_path: &Path,
     sequences_dir: &Path,
@@ -298,6 +342,8 @@ pub fn get_exclusive_kmers(
 
 // Find positions of k-mers in sequence
 #[pyclass]
+/// A struct representing a genomic region.
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct Region {
     #[pyo3(get, set)]
@@ -311,6 +357,7 @@ pub struct Region {
 
 #[pymethods]
 impl Region {
+    /// Creates a new Region.
     #[new]
     fn new(start: usize, end: usize, subsequence: String) -> Self {
         Region { start, end, subsequence }
@@ -321,6 +368,7 @@ impl Region {
     }
 }
 
+/// A struct collecting all exclusive regions found in a contig.
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct ContigRegions {
@@ -332,6 +380,7 @@ pub struct ContigRegions {
 
 #[pymethods]
 impl ContigRegions {
+    /// Creates a new ContigRegions object.
     #[new]
     fn new(header: String, regions: Vec<Region>) -> Self {
         ContigRegions {
@@ -350,6 +399,19 @@ impl ContigRegions {
 }
 
 // Find k-mer positions in a single sequence string
+/// Finds all occurrences of exclusive k-mers in a sequence.
+///
+/// Scans the sequence using a sliding window and checks if each k-mer is present in the `exclusive_kmers` set.
+///
+/// # Arguments
+///
+/// * `sequence` - The DNA sequence to scan.
+/// * `exclusive_kmers` - The set of exclusive k-mers to look for.
+/// * `k` - The k-mer size.
+///
+/// # Returns
+///
+/// A vector of starting positions (0-based) for each found exclusive k-mer.
 fn find_kmer_positions_in_sequence(
     sequence: &str,
     exclusive_kmers: &FxHashSet<u64>,
@@ -382,6 +444,17 @@ fn find_kmer_positions_in_sequence(
 
 // Merge adjacent/overlapping k-mer positions into (start, end) coordinate pairs.
 // Returns lightweight tuples — full Region structs with subsequences are built later.
+/// Merges adjacent or overlapping k-mer positions into continuous regions.
+///
+/// # Arguments
+///
+/// * `positions` - A vector of k-mer start positions.
+/// * `k` - The k-mer size (used to determine the end of each k-mer).
+/// * `min_length` - Minimum length for a merged region to be kept.
+///
+/// # Returns
+///
+/// A vector of `(start, end)` tuples representing the merged regions.
 fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize) -> Vec<(usize, usize)> {
     if positions.is_empty() {
         return Vec::new();
@@ -421,6 +494,23 @@ fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize
 // MEMORY-OPTIMIZED: Process reference contigs one-at-a-time, extract region
 // subsequences immediately, write output files inline, and drop full sequences.
 // This avoids collecting all (header, sequence) pairs into memory.
+/// Processes reference contigs to identify and extract exclusive regions.
+///
+/// This function streams the reference file, finds exclusive kmers in each contig, 
+/// merges them into regions, and writes the results to output files immediately.
+///
+/// # Arguments
+///
+/// * `reference_path` - Path to the reference FASTA file.
+/// * `exclusive_kmers` - Set of exclusive k-mers.
+/// * `k` - K-mer size.
+/// * `min_length` - Minimum region length.
+/// * `regions_output_path` - Path to write the regions summary text file.
+/// * `fasta_output_path` - Path to write the regions FASTA file.
+///
+/// # Returns
+///
+/// A `Result` containing a vector of `ContigRegions` (with subsequences).
 pub fn process_reference_contigs(
     reference_path: &Path,
     exclusive_kmers: &FxHashSet<u64>,
@@ -529,6 +619,26 @@ pub fn process_reference_contigs(
     Ok(all_contig_regions)
 }
 
+/// Python-exposed function to find regions with exclusive k-mers.
+///
+/// This is the main entry point for the k-mer analysis part of the pipeline.
+/// It wraps the Rust logic and releases the Python GIL during heavy computations.
+///
+/// # Arguments
+///
+/// * `py` - Python interpreter token.
+/// * `reference_path` - Path to reference FASTA.
+/// * `sequences_dir` - Directory with other sequence files.
+/// * `k` - K-mer size.
+/// * `num_threads` - Number of threads.
+/// * `min_region_length` - Minimum region length.
+/// * `regions_output_path` - Output path for text report.
+/// * `fasta_output_path` - Output path for FASTA file.
+/// * `max_abundance` - Max abundance in reference.
+///
+/// # Returns
+///
+/// A Python list of `ContigRegions` objects.
 #[pyfunction]
 fn process_seqs<'py>(
     py: Python<'py>,
@@ -580,6 +690,10 @@ fn process_seqs<'py>(
 // PRIMER SPECIFICITY ANALYSIS
 // ============================================================================
 
+/// A struct representing a candidate region for primer design.
+///
+/// This struct holds information about a specific genomic region and the primers
+/// designed for it, which will be evaluated for specificity.
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct PrimerCandidate {
@@ -603,6 +717,7 @@ pub struct PrimerCandidate {
 
 #[pymethods]
 impl PrimerCandidate {
+    /// Creates a new PrimerCandidate.
     #[new]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -651,28 +766,36 @@ impl PrimerSpecificityTag {
     }
 }
 
-/// Result of primer specificity analysis for a single region
+/// Result of primer specificity analysis for a single region.
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct PrimerSpecificityResult {
+    /// The header of the region being tested.
     #[pyo3(get, set)]
     pub region_header: String,
+    /// start position of the region.
     #[pyo3(get, set)]
     pub region_start: usize,
+    /// End position of the region.
     #[pyo3(get, set)]
     pub region_end: usize,
+    /// The specificity classification tag.
     #[pyo3(get)]
     pub tag: PrimerSpecificityTag,
+    /// The maximum similarity percentage found in the database.
     #[pyo3(get, set)]
     pub max_similarity: f64,
+    /// The header of the target sequence with the highest similarity.
     #[pyo3(get, set)]
     pub most_similar_target: String,
+    /// The local mismatch distance (number of edits) for the best match.
     #[pyo3(get, set)]
     pub local_distance: u32,
 }
 
 #[pymethods]
 impl PrimerSpecificityResult {
+    /// Creates a new PrimerSpecificityResult.
     #[new]
     fn new(
         region_header: String,
@@ -708,7 +831,17 @@ impl PrimerSpecificityResult {
     }
 }
 
-/// Calculate percentage similarity from Levenshtein distance
+/// Calculates percentage similarity from Levenshtein distance.
+///
+/// # Arguments
+///
+/// * `distance` - The Levenshtein edit distance.
+/// * `len_a` - Length of the first string.
+/// * `len_b` - Length of the second string.
+///
+/// # Returns
+///
+/// The similarity percentage (0.0 to 100.0).
 #[inline]
 fn calculate_similarity(distance: u32, len_a: usize, len_b: usize) -> f64 {
     let max_len = len_a.max(len_b);
@@ -718,10 +851,25 @@ fn calculate_similarity(distance: u32, len_a: usize, len_b: usize) -> f64 {
     (1.0 - (distance as f64 / max_len as f64)) * 100.0
 }
 
-/// Check primer specificity for candidates against a database of sequences.
+/// Checks primer specificity for candidates against a database of sequences.
+///
+/// This function iterates over all candidates and all target sequences, finding the best match
+/// for each candidate region in the target sequences. It computes global similarity and,
+/// if a match is found, checks for local primer specificity.
+///
+/// # Arguments
+///
+/// * `candidates` - A slice of `PrimerCandidate`s to check.
+/// * `target_sequences` - A slice of target sequences (header, sequence bytes).
+/// * `similarity_threshold` - Minimum similarity percentage to consider a match "non-specific".
+/// * `local_mismatch_threshold` - Minimum mismatches required in the primer binding site to be considered specific.
+///
+/// # Returns
+///
+/// A vector of `PrimerSpecificityResult`s.
 pub fn check_primer_specificity_candidates(
     candidates: &[PrimerCandidate],
-    target_sequences: &[(String, Vec<u8>)], // Changed to Vec<u8>
+    target_sequences: &[type_alias_tuple], // Placeholder for tuple type
     similarity_threshold: f64,
     local_mismatch_threshold: u32,
 ) -> Vec<PrimerSpecificityResult> {
@@ -901,7 +1049,14 @@ pub fn check_primer_specificity_candidates(
     results
 }
 
-/// Load sequences from a directory of FASTA files
+/// Loads sequences from a directory of FASTA files.
+///
+/// Reads all FASTA files in the given directory and returns a collected vector of (header, sequence) tuples.
+///
+/// # Arguments
+///
+/// * `dir_path` - Path to the directory containing FASTA files.
+#[allow(clippy::type_complexity)]
 pub fn load_sequences_from_directory(dir_path: &Path) -> std::io::Result<Vec<(String, Vec<u8>)>> {
     let fasta_files: Vec<PathBuf> = std::fs::read_dir(dir_path)?
         .filter_map(|entry| {
@@ -927,6 +1082,23 @@ pub fn load_sequences_from_directory(dir_path: &Path) -> std::io::Result<Vec<(St
     Ok(all_sequences)
 }
 
+/// Python-exposed function to check primer specificity.
+///
+/// This function wraps the Rust `check_primer_specificity_candidates` logic,
+/// handling loading of sequences and parallel execution.
+///
+/// # Arguments
+///
+/// * `py` - Python interpreter token.
+/// * `candidates` - List of `PrimerCandidate` objects.
+/// * `sequences_dir` - Directory containing target sequences to check against.
+/// * `similarity_threshold` - Global similarity threshold.
+/// * `local_mismatch_threshold` - Local mismatch threshold for primer binding.
+/// * `num_threads` - Number of threads to use.
+///
+/// # Returns
+///
+/// A Python list of `PrimerSpecificityResult` objects.
 #[pyfunction]
 fn check_specificity<'py>(
     py: Python<'py>,

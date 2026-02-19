@@ -9,6 +9,12 @@ console = Console()
 
 
 def show_version(flag) -> None:
+    """
+    Show the application version and exit.
+
+    Args:
+        flag (bool): The flag value. If True, prints the version and exits.
+    """
     if flag:
         print(f"diffprimer version: {__version__}")
         raise Exit(code=0)

@@ -1,0 +1,62 @@
+site_name: diffprimer
+site_description: Documentation for diffprimer - a primer design tool in Python and Rust
+site_url: https://omatheuspimenta.github.io/diffprimer/
+repo_url: https://github.com/omatheuspimenta/diffprimer
+repo_name: omatheuspimenta/diffprimer
+
+theme:
+  name: material
+  # logo: logo.png (removed to hide logo)
+  favicon: logo.png
+  palette:
+    # Palette toggle for light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: light-blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - toc.integrate
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - How to Use: how-to-use.md
+  - API Reference: api.md

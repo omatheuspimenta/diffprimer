@@ -35,3 +35,7 @@ dev = [
     "maturin>=1.11.5",
     "pytest>=9.0.2",
 ]
+docs = [
+    "mkdocs-material>=9.7.2",
+    "mkdocstrings[python]>=1.0.3",
+]

@@ -31,6 +31,16 @@ logtext.setLevel(20)
 
 
 def _make_progress(total: bool = False) -> Progress:
+    """
+    Create a configured Rich Progress instance.
+
+    Args:
+        total (bool): If True, includes a column for M of N completion (checking specificity, etc).
+                      If False, uses a simpler progress bar (scanning, etc).
+
+    Returns:
+        Progress: A configured Rich Progress object.
+    """
     spinners = [
         "aesthetic",
         "shark",

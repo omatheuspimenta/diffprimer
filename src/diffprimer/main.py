@@ -69,7 +69,24 @@ def main(
     reference_max_abundance: int = 1,
     check_specificity: bool = False,
     similarity_threshold: float = 80.0,
-) -> None:    
+) -> None:
+    """
+    Main execution logic for the diffprimer pipeline.
+
+    Orchestrates the finding of exclusive regions, primer design, and optional specificity checks.
+
+    Args:
+        reference_file (str): Path to the reference FASTA file.
+        sequences_path (str): Directory containing target sequences.
+        annotation_path (str): Path to the GFF3 annotation file.
+        config_file (str): Path to the Primer3 configuration file.
+        k (int): K-mer size for sequence comparison.
+        cpus (int | None): Number of CPUs to use. If None, uses all available - 1.
+        min_region_length (int): Minimum length for exclusive regions.
+        reference_max_abundance (int): Max k-mer abundance in reference to be considered unique.
+        check_specificity (bool): Whether to perform specificity checks on designed primers.
+        similarity_threshold (float): Threshold (%) for specificity checks.
+    """    
     input_table = Table(show_header=False, box=None, padding=(0, 2))
     input_table.add_column("Parameter", style="bold cyan")
     input_table.add_column("Value", style="white")
