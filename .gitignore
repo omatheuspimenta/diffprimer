@@ -57,3 +57,6 @@ htmlcov/
 # DiffPrimer specific outputs
 diffprimer_results.csv
 *.log
+
+# Documentation
+site/
