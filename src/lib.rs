@@ -196,10 +196,9 @@ pub fn get_exclusive_kmers(
     max_abundance: u32,
 ) -> std::io::Result<FxHashSet<u64>> {
     // Configure Rayon thread pool
-    rayon::ThreadPoolBuilder::new()
+    let _ = rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
-        .build_global()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .build_global();
 
     // Extract k-mers from reference sequence with counting
     let spinner = indicatif::ProgressBar::new_spinner();
@@ -221,15 +220,16 @@ pub fn get_exclusive_kmers(
     spinner.finish_with_message(format!("Extracted {} unique k-mers from reference", reference_counts.len()));
     
     // Filter k-mers that exceed max abundance in reference
-    let reference_kmers: FxHashSet<u64> = reference_counts
+    let mut exclusive_kmers: FxHashSet<u64> = reference_counts
         .into_iter()
         .filter(|&(_, count)| count <= max_abundance)
         .map(|(kmer, _)| kmer)
         .collect();
+    exclusive_kmers.shrink_to_fit();
 
     println!(
         "Found {} suitable k-mers in reference (abundance <= {})", 
-        reference_kmers.len(), 
+        exclusive_kmers.len(), 
         max_abundance
     );
 
@@ -260,18 +260,24 @@ pub fn get_exclusive_kmers(
             .progress_chars("#>-"),
     );
 
-    // Shared HashSet for all k-mers found in other sequences
-    let all_other_kmers = Arc::new(Mutex::new(FxHashSet::default()));
+    // MEMORY OPTIMIZATION: Instead of building a second giant HashSet of all other
+    // k-mers and then computing set difference, we subtract in-place from the
+    // reference set. Each file's k-mers are extracted and used to remove matches
+    // from the shared set. Peak memory: O(|ref_kmers|) instead of O(|ref| + |all_others|).
+    let shared_exclusive = Arc::new(Mutex::new(exclusive_kmers));
 
-    // Process all files in parallel, each thread adds to shared HashSet
     fasta_files.par_iter().for_each(|seq_path| {
+        // Extract k-mers from this file into a thread-local set
         match extract_kmers_from_sequence(seq_path, k) {
             Ok(file_kmers) => {
-                // Lock and insert k-mers from this file
+                // Remove matching k-mers from the shared exclusive set
                 {
-                    let mut shared_kmers = all_other_kmers.lock().unwrap();
-                    shared_kmers.extend(file_kmers);
+                    let mut exclusive = shared_exclusive.lock().unwrap();
+                    for kmer in &file_kmers {
+                        exclusive.remove(kmer);
+                    }
                 }
+                // file_kmers is dropped here — no accumulation
                 progress_bar.inc(1);
             }
             Err(e) => {
@@ -281,19 +287,10 @@ pub fn get_exclusive_kmers(
     });
     progress_bar.finish_with_message("Done processing files");
 
-    // Extract final HashSet and compute difference
-    let other_kmers = Arc::try_unwrap(all_other_kmers)
+    let exclusive_kmers = Arc::try_unwrap(shared_exclusive)
         .unwrap()
         .into_inner()
         .unwrap();
-    println!(
-        "Found {} total k-mers in other sequences",
-        other_kmers.len()
-    );
-
-    // Compute exclusive k-mers (reference - others)
-    let exclusive_kmers: FxHashSet<u64> =
-        reference_kmers.difference(&other_kmers).copied().collect();
 
     println!("Found {} exclusive k-mers", exclusive_kmers.len());
     Ok(exclusive_kmers)
@@ -307,17 +304,20 @@ pub struct Region {
     pub start: usize,
     #[pyo3(get, set)]
     pub end: usize,
+    /// The extracted subsequence for this region (avoids storing the full contig).
+    #[pyo3(get, set)]
+    pub subsequence: String,
 }
 
 #[pymethods]
 impl Region {
     #[new]
-    fn new(start: usize, end: usize) -> Self {
-        Region { start, end }
+    fn new(start: usize, end: usize, subsequence: String) -> Self {
+        Region { start, end, subsequence }
     }
 
     fn __repr__(&self) -> String {
-        format!("Region(start={}, end={})", self.start, self.end)
+        format!("Region(start={}, end={}, len={})", self.start, self.end, self.subsequence.len())
     }
 }
 
@@ -327,27 +327,23 @@ pub struct ContigRegions {
     #[pyo3(get, set)]
     pub header: String,
     #[pyo3(get, set)]
-    pub sequence: String,
-    #[pyo3(get, set)]
     pub regions: Vec<Region>,
 }
 
 #[pymethods]
 impl ContigRegions {
     #[new]
-    fn new(header: String, sequence: String, regions: Vec<Region>) -> Self {
+    fn new(header: String, regions: Vec<Region>) -> Self {
         ContigRegions {
             header,
-            sequence,
             regions,
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ContigRegions(header='{}', sequence_length={}, num_regions={})",
+            "ContigRegions(header='{}', num_regions={})",
             self.header,
-            self.sequence.len(),
             self.regions.len()
         )
     }
@@ -384,8 +380,9 @@ fn find_kmer_positions_in_sequence(
     positions
 }
 
-// Update the merge_positions_to_regions function to accept min_length:
-fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize) -> Vec<Region> {
+// Merge adjacent/overlapping k-mer positions into (start, end) coordinate pairs.
+// Returns lightweight tuples — full Region structs with subsequences are built later.
+fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize) -> Vec<(usize, usize)> {
     if positions.is_empty() {
         return Vec::new();
     }
@@ -405,10 +402,7 @@ fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize
             // Save current region if it meets minimum length
             let region_length = current_end - current_start;
             if region_length >= min_length {
-                regions.push(Region {
-                    start: current_start,
-                    end: current_end,
-                });
+                regions.push((current_start, current_end));
             }
             current_start = pos;
             current_end = pos + k;
@@ -418,44 +412,36 @@ fn merge_positions_to_regions(positions: Vec<usize>, k: usize, min_length: usize
     // Add the last region if it meets minimum length
     let region_length = current_end - current_start;
     if region_length >= min_length {
-        regions.push(Region {
-            start: current_start,
-            end: current_end,
-        });
+        regions.push((current_start, current_end));
     }
 
     regions
 }
 
-// Main function to find regions for all contigs
-pub fn find_kmer_occurrence_regions_multi_fasta(
+// MEMORY-OPTIMIZED: Process reference contigs one-at-a-time, extract region
+// subsequences immediately, write output files inline, and drop full sequences.
+// This avoids collecting all (header, sequence) pairs into memory.
+pub fn process_reference_contigs(
     reference_path: &Path,
     exclusive_kmers: &FxHashSet<u64>,
     k: usize,
     min_length: usize,
+    regions_output_path: &Path,
+    fasta_output_path: &Path,
 ) -> std::io::Result<Vec<ContigRegions>> {
-    // NOTE: This now reads all sequences into memory to parallelize.
-    // Ideally, we would stream + parallelize, but par_iter requires the collection to exist.
-    // For now, let's keep the read_all logic here locally or re-use MultiFastaReader 
-    // to collect into a Vec, then par_iter.
-    
-    // We cannot use the streaming iterator directly with Rayon's par_iter easily without collecting.
-    // So we collect (which is same memory usage as before, but validation logic is better).
-    // Optimization: In future we could use Rayon's par_bridge() on the iterator!
-    
-    let mut sequences = Vec::new();
-    let reader = MultiFastaReader::new(reference_path)?;
-    for result in reader {
-        sequences.push(result?);
-    }
+    // Count contigs for progress bar (lightweight pass)
+    let contig_count = {
+        let reader = MultiFastaReader::new(reference_path)?;
+        reader.count() as u64
+    };
 
     println!(
         "Processing {} contigs for exclusive regions (min length: {})...",
-        sequences.len(),
+        contig_count,
         min_length
     );
     
-    let progress_bar = indicatif::ProgressBar::new(sequences.len() as u64);
+    let progress_bar = indicatif::ProgressBar::new(contig_count);
     progress_bar.set_style(
         indicatif::ProgressStyle::default_bar()
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({eta}) {msg}")
@@ -463,49 +449,44 @@ pub fn find_kmer_occurrence_regions_multi_fasta(
             .progress_chars("#>-"),
     );
 
-    let all_contig_regions: Vec<ContigRegions> = sequences
-        .par_iter()
-        .map(|(header, sequence)| {
-            // Use thread-local increment? indicatif handles this.
-            progress_bar.inc(1);
-            
-            // Find k-mer positions in this sequence
-            let positions = find_kmer_positions_in_sequence(sequence, exclusive_kmers, k);
+    // Open output files once
+    let mut regions_file = File::create(regions_output_path)?;
+    let mut fasta_file = File::create(fasta_output_path)?;
+    let mut total_fasta_regions = 0usize;
 
-            // Merge positions into regions with minimum length filter
-            let regions = merge_positions_to_regions(positions, k, min_length);
+    // Stream contigs one at a time — only one full sequence in memory at a time
+    let reader = MultiFastaReader::new(reference_path)?;
+    let mut all_contig_regions = Vec::new();
 
-            ContigRegions {
-                header: header.clone(),
-                sequence: sequence.clone(),
-                regions,
-            }
-        })
-        .collect();
+    for result in reader {
+        let (header, sequence) = result?;
 
-    progress_bar.finish_with_message("Done processing contigs");
+        // Find k-mer positions in this sequence
+        let positions = find_kmer_positions_in_sequence(&sequence, exclusive_kmers, k);
 
-    Ok(all_contig_regions)
-}
+        // Merge positions into regions with minimum length filter
+        let raw_regions = merge_positions_to_regions(positions, k, min_length);
 
-// Write regions summary to file
-pub fn write_regions_file(
-    contig_regions: &[ContigRegions],
-    output_path: &Path,
-) -> std::io::Result<()> {
-    let mut file = File::create(output_path)?;
+        // Extract subsequences and build Region structs with embedded subsequences
+        let regions: Vec<Region> = raw_regions
+            .iter()
+            .map(|&(start, end)| {
+                let subseq = sequence[start..end].to_string();
+                Region {
+                    start,
+                    end,
+                    subsequence: subseq,
+                }
+            })
 
-    for contig in contig_regions {
-        writeln!(file, "HEADER: {}", contig.header)?;
-        writeln!(
-            file,
-            "REGIONS: {} exclusive regions found",
-            contig.regions.len()
-        )?;
+            .collect();
 
-        for (idx, region) in contig.regions.iter().enumerate() {
+        // Write regions summary inline
+        writeln!(regions_file, "HEADER: {}", header)?;
+        writeln!(regions_file, "REGIONS: {} exclusive regions found", regions.len())?;
+        for (idx, region) in regions.iter().enumerate() {
             writeln!(
-                file,
+                regions_file,
                 "\tRegion {}: {}-{} (length: {})",
                 idx + 1,
                 region.start,
@@ -513,46 +494,39 @@ pub fn write_regions_file(
                 region.end - region.start
             )?;
         }
-        writeln!(file)?; // Empty line between contigs
-    }
+        writeln!(regions_file)?;
 
-    println!("Regions summary written to: {:?}", output_path);
-    Ok(())
-}
-
-// Write exclusive regions as FASTA sequences
-pub fn write_exclusive_regions_fasta(
-    contig_regions: &[ContigRegions],
-    output_path: &Path,
-) -> std::io::Result<()> {
-    let mut file = File::create(output_path)?;
-    let mut total_regions = 0;
-
-    for contig in contig_regions {
-        for (region_idx, region) in contig.regions.iter().enumerate() {
-            // Extract sequence for this region
-            let region_sequence = &contig.sequence[region.start..region.end];
-
-            // Create header for this region
-            let region_header = format!("{}_region_{}_{}:{}", contig.header, region_idx + 1, region.start, region.end);
-
-            // Write FASTA entry
-            writeln!(file, ">{}", region_header)?;
-
-            // Write sequence in lines of 80 characters (standard FASTA format)
-            for chunk in region_sequence.as_bytes().chunks(80) {
-                writeln!(file, "{}", String::from_utf8_lossy(chunk))?;
+        // Write FASTA entries inline
+        for (region_idx, region) in regions.iter().enumerate() {
+            let region_header = format!(
+                "{}_region_{}_{}:{}",
+                header, region_idx + 1, region.start, region.end
+            );
+            writeln!(fasta_file, ">{}", region_header)?;
+            for chunk in region.subsequence.as_bytes().chunks(80) {
+                writeln!(fasta_file, "{}", String::from_utf8_lossy(chunk))?;
             }
-
-            total_regions += 1;
+            total_fasta_regions += 1;
         }
+
+        // Store lightweight ContigRegions (no full sequence)
+        all_contig_regions.push(ContigRegions {
+            header,
+            regions,
+        });
+
+        // `sequence` is dropped here — memory freed immediately
+        progress_bar.inc(1);
     }
 
+    progress_bar.finish_with_message("Done processing contigs");
+    println!("Regions summary written to: {:?}", regions_output_path);
     println!(
         "Extracted {} exclusive regions to FASTA: {:?}",
-        total_regions, output_path
+        total_fasta_regions, fasta_output_path
     );
-    Ok(())
+
+    Ok(all_contig_regions)
 }
 
 #[pyfunction]
@@ -575,7 +549,7 @@ fn process_seqs<'py>(
     // Release GIL for expensive computations
     #[allow(deprecated)]
     let contig_regions = py.allow_threads(move || {
-        // Step 1: Get exclusive k-mers
+        // Step 1: Get exclusive k-mers (subtract-in-place, memory efficient)
         let exclusive_kmers = get_exclusive_kmers(
             &reference_path,
             &sequences_dir,
@@ -584,26 +558,19 @@ fn process_seqs<'py>(
             max_abundance,
         ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        // Step 2: Find k-mer occurrence regions in reference
-        let contig_regions = find_kmer_occurrence_regions_multi_fasta(
+        // Step 2+3+4: Stream reference contigs, find regions, write output files
+        // inline — only one contig sequence in memory at a time
+        let contig_regions = process_reference_contigs(
             &reference_path,
             &exclusive_kmers,
             k,
             min_region_length,
+            &regions_output_path,
+            &fasta_output_path,
         ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-        // Step 3: Write regions summary to file
-        write_regions_file(&contig_regions, &regions_output_path)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-        // Step 4: Write exclusive regions as FASTA
-        write_exclusive_regions_fasta(&contig_regions, &fasta_output_path)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         Ok::<_, std::io::Error>(contig_regions)
     }).map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))?;
-
-
 
     // Convert to Python list
     Ok(pyo3::types::PyList::new(py, contig_regions)?)

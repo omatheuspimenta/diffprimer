@@ -27,7 +27,7 @@ def design_primers_for_contig(contig_data, global_args):
     Worker function to design primers for a single contig.
     Returns a list of result dictionaries to be written to CSV.
     """
-    header, sequence, regions = contig_data
+    header, regions = contig_data
     results = []
     
     n_region = 0
@@ -35,8 +35,8 @@ def design_primers_for_contig(contig_data, global_args):
         # region is passed as a dict to avoid pickling issues with PyO3 objects
         start = region["start"]
         end = region["end"]
+        region_seq = region["subsequence"]
         
-        region_seq = sequence[start:end]
         get_primers_result = get_primers(region_seq, global_args)
         
         if (
@@ -173,8 +173,9 @@ def main(
     contig_data_list = []
     for contig in result:
         # Convert Rust Region objects to pure Python types (dicts)
-        regions_data = [{"start": r.start, "end": r.end} for r in contig.regions]
-        contig_data_list.append((contig.header, contig.sequence, regions_data))
+        # Each region now carries its own subsequence — no need for the full contig sequence
+        regions_data = [{"start": r.start, "end": r.end, "subsequence": r.subsequence} for r in contig.regions]
+        contig_data_list.append((contig.header, regions_data))
 
     logger.info(f"Designing primers for {len(contig_data_list)} contigs using {cpus} workers...")
 

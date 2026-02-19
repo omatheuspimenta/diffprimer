@@ -95,9 +95,8 @@ def test_exclusive_regions_identification(tmp_path):
     # Verify the exclusive region contains part of the unique core
     found_unique = False
     for reg in c2.regions:
-        seq = c2.sequence[reg.start:reg.end]
-        # Check for a substring of the unique core
-        if "TCTGATAGCAGC" in seq:
+        # Region now carries its own subsequence — no need to slice from full sequence
+        if "TCTGATAGCAGC" in reg.subsequence:
             found_unique = True
             break
     

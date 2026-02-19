@@ -75,24 +75,6 @@ def run(
             rich_help_panel="Input/Output",
         ),
     ],
-    annotation_path: Annotated[
-        str,
-        Option(
-            "--annotation-path",
-            "-a",
-            help=(
-                "Genome annotation file associated with the reference sequence.\n\n"
-                "Typically provided in GFF3 format and used to map "
-                "exclusive regions to annotated features."
-            ),
-            exists=True,
-            file_okay=True,
-            dir_okay=False,
-            readable=True,
-            resolve_path=True,
-            rich_help_panel="Input/Output",
-        ),
-    ],
     config_file: Annotated[
         str,
         Option(
@@ -113,6 +95,24 @@ def run(
             rich_help_panel="Input/Output",
         ),
     ],
+    annotation_path: Annotated[
+        str | None,
+        Option(
+            "--annotation-path",
+            "-a",
+            help=(
+                "Genome annotation file associated with the reference sequence.\n\n"
+                "Typically provided in GFF3 format and used to map "
+                "exclusive regions to annotated features."
+            ),
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+            rich_help_panel="Input/Output",
+        ),
+    ] = None,
     k: Annotated[
         int,
         Option(
