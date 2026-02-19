@@ -340,8 +340,7 @@ pub fn get_exclusive_kmers(
     Ok(exclusive_kmers)
 }
 
-// Find positions of k-mers in sequence
-#[pyclass]
+// Find positions of k-mers in reference contigs, merge into regions, and extract subsequences for output
 /// A struct representing a genomic region.
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -869,7 +868,7 @@ fn calculate_similarity(distance: u32, len_a: usize, len_b: usize) -> f64 {
 /// A vector of `PrimerSpecificityResult`s.
 pub fn check_primer_specificity_candidates(
     candidates: &[PrimerCandidate],
-    target_sequences: &[type_alias_tuple], // Placeholder for tuple type
+    target_sequences: &[(String, Vec<u8>)], // Placeholder for tuple type
     similarity_threshold: f64,
     local_mismatch_threshold: u32,
 ) -> Vec<PrimerSpecificityResult> {
