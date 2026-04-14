@@ -891,7 +891,6 @@ pub fn check_primer_specificity_candidates(
     let results: Vec<PrimerSpecificityResult> = candidates
         .par_iter()
         .map(|candidate| {
-            progress_bar.inc(1);
             let region_seq = candidate.region_sequence.as_bytes();
             let region_len = region_seq.len();
             
@@ -1025,7 +1024,7 @@ pub fn check_primer_specificity_candidates(
             let most_similar_target = best_target_match.map(|(h, _)| h.to_string()).unwrap_or_default();
             let local_distance = if min_distance == usize::MAX { u32::MAX } else { min_distance as u32 };
 
-            PrimerSpecificityResult {
+            let result = PrimerSpecificityResult {
                 region_header: candidate.header.clone(),
                 region_start: candidate.start,
                 region_end: candidate.end,
@@ -1033,7 +1032,10 @@ pub fn check_primer_specificity_candidates(
                 max_similarity,
                 most_similar_target,
                 local_distance,
-            }
+            };
+
+            progress_bar.inc(1);
+            result
         })
         .collect();
         
