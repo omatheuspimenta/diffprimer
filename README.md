@@ -1,14 +1,16 @@
 # DiffPrimer
 
-**DiffPrimer** is a robust bioinformatics tool designed to identify unique genomic regions in a reference genome compared to a set of other "background" genomes and automatically design specific PCR primers for these markers.
+![diffprimer_logo](docs/logo.png)
+
+**DiffPrimer** is a bioinformatics tool designed to identify unique genomic regions in a reference genome compared to a set of other "background" genomes and automatically design specific PCR primers for these markers.
 
 It combines high-performance k-mer analysis (written in Rust) with standard primer design tools (Primer3) to generate diagnostic markers that are exclusive to your target organism.
 
 ## Key Features
 
--   **Exclusive Region Discovery**: Efficiently identifies genomic regions present in your reference but absent in a database of other genomes.
+-   **Exclusive Region Discovery**: Identifies genomic regions present in your reference but absent in a database of other genomes.
 -   **Automated Primer Design**: Integrated with **Primer3** to design optimal primer pairs for identified unique regions.
--   **Rigorous Specificity Check**: 
+-   **Specificity Check**: 
     -   Validates designed primers against *all* input background genomes.
     -   Uses a hybrid **Myers Bit-Vector Algorithm** (Global) and **Semiglobal Alignment** (Local) to detect potential off-target amplification, even with insertions/deletions.
 -   **Annotation Integration**: Cross-references unique regions with GFF3 annotation files to identify which genes (if any) the markers overlap with.
@@ -79,7 +81,6 @@ The main command is `run`. This executes the full pipeline: finding unique regio
 diffprimer run \
     --reference-file reference.fasta \
     --sequences-path genomes_directory/ \
-    --output-file my_markers.csv
 ```
 
 ### Complete Example
@@ -89,7 +90,7 @@ diffprimer run \
     --reference-file data/target_species.fasta \
     --sequences-path data/background_species/ \
     --annotation-path data/target_annotations.gff3 \
-    --config-file primer3_config.txt \
+    --config-file primer3_config.ini \
     --min-region-length 200 \
     --cpus 8 \
     --check-specificity
@@ -103,7 +104,7 @@ diffprimer run \
 | `--sequences-path` | `-s` | **Required.** Directory containing background genomes (FASTA) to compare against. Regions found in these genomes will be excluded. |
 | `--annotation-path` | `-a` | (Optional) GFF3 file for the reference. Used to annotate output regions with gene names + product info. |
 | `--config-file` | `-c` | (Optional) Primer3 configuration file defining Tm, GC%, and size constraints. |
-| `--output-file` | `-o` | Name of the results CSV file (Default: `diffprimer_results.csv`). |
+| `--reference-max-abundance` | | Maximum allowed frequency of a k-mer in the reference genome to be considered a candidate marker. Use 1 for strictly unique markers (default). Increasing this value allows markers that are repeated a few times in the reference. (Default: 1) |
 | `--kmer-size` | `-k` | K-mer size for uniqueness check (Default: 21). |
 | `--min-region-length` | `-m` | Minimum length of unique regions to keep (Default: 200 bp). |
 | `--check-specificity` | | **Highly Recommended.** Enables the rigorous cryptographic check of primer specificity. Without this, primers are only designed on unique regions but not physically verified against off-targets. |

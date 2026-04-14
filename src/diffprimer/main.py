@@ -61,8 +61,8 @@ def design_primers_for_contig(contig_data, global_args):
 def main(
     reference_file: str,
     sequences_path: str,
-    annotation_path: str,
-    config_file: str,
+    annotation_path: str | None,
+    config_file: str | None,
     k: int = 21,
     cpus: int | None = None,
     min_region_length: int = 200,
@@ -78,8 +78,8 @@ def main(
     Args:
         reference_file (str): Path to the reference FASTA file.
         sequences_path (str): Directory containing target sequences.
-        annotation_path (str): Path to the GFF3 annotation file.
-        config_file (str): Path to the Primer3 configuration file.
+        annotation_path (str | None): Path to the GFF3 annotation file.
+        config_file (str | None): Path to the Primer3 configuration file.
         k (int): K-mer size for sequence comparison.
         cpus (int | None): Number of CPUs to use. If None, uses all available - 1.
         min_region_length (int): Minimum length for exclusive regions.
@@ -123,7 +123,10 @@ def main(
     p3_table.add_column("Parameter", style="dim")
     p3_table.add_column("Value", style="yellow")
     
-    global_args = load_config(config_file)
+    if config_file is None:
+        global_args = load_config(None)
+    else:
+        global_args = load_config(config_file)
     # Logic to split dictionary into pairs for the table
     items = list(global_args.items())
     for i in range(0, len(items), 2):

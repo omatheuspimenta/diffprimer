@@ -31,9 +31,6 @@ $$ \Omega_B = \bigcup_{i=1}^N \{ w \mid (w, c_w) \in \mathcal{K}_{B_i} \} $$
 The set of candidate diagnostic markers $\mathcal{D}$ is the set difference:
 $$ \mathcal{D} = \mathcal{U}_R \setminus \Omega_B $$
 
-**Computation:**
-Constructing $\Omega_B$ explicitly is memory-prohibitive. We approximate $\Omega_B$ using a **Bloom Filter** or exact Hash Set optimizations, achieving average-case $O(1)$ lookups. The complexity of constructing $\mathcal{D}$ is $O(|R| + \sum |B_i|)$.
-
 **Contig Assembly:**
 Continuous regions are assembled from $\mathcal{D}$. Two $k$-mers $w_i, w_j \in \mathcal{D}$ (at positions $p_i, p_j$ in $R$) are merged into a region $S_{region}$ if $p_j = p_i + 1$. This yields a set of candidate amplicons $\mathcal{S} = \{S_1, S_2, \dots\}$.
 
@@ -52,18 +49,6 @@ Let $D_{i,j}$ be the edit distance between $S[1..i]$ and $B[1..j]$.
 We define delta variables for the vertical differences in the DP matrix:
 $$ \Delta V_{i,j} = D_{i,j} - D_{i-1,j} \in \{-1, 0, +1\} $$
 These are encoded using two bit-vectors, $VP$ (Vertical Positive) and $VN$ (Vertical Negative), such that the $i$-th bit is set if $\Delta V_{i,j} = +1$ or $-1$ respectively.
-
-**Recurrence Relations:**
-For each character $B[j]$ in the background:
-1.  **Pattern Mask**: $X_j = \text{PM}[B[j]]$ (Bitmask of occurrences of char $B[j]$ in $S$).
-2.  **Horizontal/Vertical Interaction**:
-    $$ D0 = (((X_j \& VP) + VP) \oplus VP) \lor X_j \lor VN $$
-    $$ HP = (VN \lor \neg(D0 \lor VP)) $$
-    $$ HN = VP \& D0 $$
-3.  **State Update**:
-    $$ VP' = (HN \ll 1) \lor \neg(D0 \lor HN \lor X_j) \text{ (approximation)} $$
-    $$ VN' = (HP \ll 1) $$
-    *(Note: Implementation uses full `long::Myers` chaining for patterns where $m > 64$, maintaining state across `u64` blocks).*
 
 **Complexity:** $O(\lceil \frac{m}{64} \rceil \cdot n)$, where $n=|B|$. This provides a $64\times$ speedup over standard Levenshtein calculation.
 
@@ -93,15 +78,7 @@ If $\delta_{local} \le T_{mismatch}$ (default 2 mismatches) for **both** forward
 
 ---
 
-## 4. Complexity Analysis
-
-1.  **Region Discovery**: $O(N \cdot L)$, linear with respect to total input size.
-2.  **Primer Design**: $O(|\mathcal{S}| \cdot m^2)$ via Primer3 (Thermodynamic alignment).
-3.  **Specificity Check**:
-    -   Worst case: $O(|\mathcal{S}| \cdot \lceil \frac{m}{64} \rceil \cdot L_{total})$.
-    -   Average case is heavily optimized by bit-vector filtering, where expensive Stage II alignment is only performed on rare high-similarity hits ($<1\%$ of genome).
-
-## 5. Statistical Scoring
+## 4. Statistical Scoring
 
 Homology is reported as:
 $$ \text{Similarity Score} = \left( 1 - \frac{d_{min}}{L_{amplicon}} \right) \times 100 $$

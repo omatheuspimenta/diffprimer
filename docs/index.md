@@ -4,15 +4,15 @@
   <img src="logo.png" alt="DiffPrimer Logo" width="300"/>
 </p>
 
-**DiffPrimer** is a robust bioinformatics tool designed to identify **unique genomic regions** in a reference genome compared to a set of other "background" genomes and automatically design **specific PCR primers** for these markers.
+**DiffPrimer** is a bioinformatics tool designed to identify **unique genomic regions** in a reference genome compared to a set of other "background" genomes and automatically design **specific PCR primers** for these markers.
 
-It combines high-performance k-mer analysis (written in Rust) with standard primer design tools (Primer3) to generate diagnostic markers that are exclusive to your target organism.
+It combines high-performance k-mer analysis with standard primer design tools (Primer3) to generate diagnostic markers that are exclusive to your target organism.
 
 ## Key Features
 
--   **Exclusive Region Discovery**: Efficiently identifies genomic regions present in your reference but absent in a database of other genomes.
+-   **Exclusive Region Discovery**: Identifies genomic regions present in your reference but absent in a database of other genomes.
 -   **Automated Primer Design**: Integrated with **Primer3** to design optimal primer pairs for identified unique regions.
--   **Rigorous Specificity Check**:
+-   **Specificity Check**:
     -   Validates designed primers against *all* input background genomes.
     -   Uses a hybrid **Myers Bit-Vector Algorithm** (Global) and **Semiglobal Alignment** (Local) to detect potential off-target amplification, even with insertions/deletions.
 -   **Annotation Integration**: Cross-references unique regions with GFF3 annotation files to identify which genes (if any) the markers overlap with.
@@ -39,7 +39,7 @@ For detailed installation instructions, including virtual environment setup and 
 
 ## How to Cite
 
-> [!NOTE]
+> [!NOTE]  
 > Citation information is coming soon.
 
 ## Contributing

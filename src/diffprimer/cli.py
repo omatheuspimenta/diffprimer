@@ -82,7 +82,7 @@ def run(
         ),
     ],
     config_file: Annotated[
-        str,
+        str | None,
         Option(
             "--config-file",
             "-c",
@@ -100,7 +100,7 @@ def run(
             resolve_path=True,
             rich_help_panel="Input/Output",
         ),
-    ],
+    ] = None,
     annotation_path: Annotated[
         str | None,
         Option(

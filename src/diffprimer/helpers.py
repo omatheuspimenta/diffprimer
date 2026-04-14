@@ -65,8 +65,8 @@ def get_primers(sequence: str, global_args: dict) -> dict:
 
 
 def annotation_dataframe(
-    annotation_path: str,
-) -> pd.DataFrame:
+    annotation_path: str | None,
+) -> pd.DataFrame | None:
     """
     Process annotation information from a GFF3 file into a DataFrame and a sequence \
     interval Series.
@@ -77,6 +77,9 @@ def annotation_dataframe(
     Returns:
         df_annotation (pd.DataFrame): A DataFrame with processed annotation data.
     """
+    if annotation_path is None:
+        logger.info("No annotation file provided. Skipping annotation processing.")
+        return None  # Return None if no annotation file is provided
     df_annotation = gffpd.read_gff3(annotation_path).attributes_to_columns()
 
     df_annotation["interval"] = df_annotation.apply(
