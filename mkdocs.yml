@@ -60,3 +60,4 @@ nav:
   - Home: index.md
   - How to Use: how-to-use.md
   - API Reference: api.md
+  - Algorithm Description and Mathematical Formulation: math.md
