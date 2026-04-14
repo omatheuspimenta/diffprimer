@@ -4,7 +4,7 @@
 
 DiffPrimer addresses the "Exclusive Region Identification Problem" in comparative genomics. The objective is to identify genomic subsequences $S$ present in a target taxonomic sets $\mathcal{T}$ that satisfy a uniqueness constraint with respect to a background set $\mathcal{B}$, and subsequently design Polymerase Chain Reaction (PCR) primers $P$ that maximize specificity.
 
-The pipeline integrates three computational paradigms:
+The pipeline integrates three computational paradigms:  
 1.  **Alignment-Free Sequence Comparison**: Using $k$-mer multisets for region discovery.
 2.  **Bit-Parallel Approximate String Matching**: Myers' algorithm for global homology filtering.
 3.  **Semiglobal Dynamic Programming**: For precise local primer verification.
