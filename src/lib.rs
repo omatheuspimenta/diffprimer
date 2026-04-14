@@ -6,11 +6,25 @@ use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
+use std::cell::RefCell;
 use bio::alignment::distance::simd::bounded_levenshtein;
 use bio::pattern_matching::myers::long::Myers;
 use bio::alignment::pairwise::Aligner;
 use bio::alignment::AlignmentOperation;
+
+/// Scoring function for semiglobal DNA alignment.
+/// Defined as a named fn so it can be used as a `fn` pointer in `thread_local!`.
+fn dna_score(a: u8, b: u8) -> i32 {
+    if a == b { 1 } else { -1 }
+}
+
+thread_local! {
+    /// Per-thread Aligner, reused across every alignment on a given Rayon worker.
+    /// Avoids repeated heap allocation of the DP scoring matrix (typ. ~120 KB each).
+    static THREAD_ALIGNER: RefCell<Aligner<fn(u8, u8) -> i32>> =
+        RefCell::new(Aligner::with_capacity(200, 300, -1, -1, dna_score));
+}
 
 // 2-bit encoding for DNA bases
 const A: u64 = 0b00;
@@ -304,37 +318,38 @@ pub fn get_exclusive_kmers(
             .progress_chars("#>-"),
     );
 
-    // MEMORY OPTIMIZATION: Instead of building a second giant HashSet of all other
-    // k-mers and then computing set difference, we subtract in-place from the
-    // reference set. Each file's k-mers are extracted and used to remove matches
-    // from the shared set. Peak memory: O(|ref_kmers|) instead of O(|ref| + |all_others|).
-    let shared_exclusive = Arc::new(Mutex::new(exclusive_kmers));
+    // LOCK-FREE PIPELINE: Rayon extracts k-mers from all files in parallel on a
+    // dedicated thread. The calling thread drains the channel and subtracts in-place,
+    // pipelined with extraction. The bounded channel caps memory to
+    // O(num_threads × max_file_kmers) — no Mutex contention.
+    let (tx, rx) = mpsc::sync_channel::<FxHashSet<u64>>(num_threads.max(4));
+    let bar_clone = progress_bar.clone();
 
-    fasta_files.par_iter().for_each(|seq_path| {
-        // Extract k-mers from this file into a thread-local set
-        match extract_kmers_from_sequence(seq_path, k) {
-            Ok(file_kmers) => {
-                // Remove matching k-mers from the shared exclusive set
-                {
-                    let mut exclusive = shared_exclusive.lock().unwrap();
-                    for kmer in &file_kmers {
-                        exclusive.remove(kmer);
-                    }
+    let extraction_handle = std::thread::spawn(move || {
+        fasta_files.par_iter().for_each_with(tx, |tx, seq_path| {
+            match extract_kmers_from_sequence(seq_path, k) {
+                Ok(file_kmers) => {
+                    bar_clone.inc(1);
+                    // Blocks when channel is full — natural backpressure limits memory
+                    let _ = tx.send(file_kmers);
                 }
-                // file_kmers is dropped here — no accumulation
-                progress_bar.inc(1);
+                Err(e) => {
+                    bar_clone.println(format!("Error processing {:?}: {}", seq_path, e));
+                }
             }
-            Err(e) => {
-                progress_bar.println(format!("Error processing {:?}: {}", seq_path, e));
-            }
-        }
+        });
+        // tx is dropped here — channel closes, the rx loop below terminates
     });
-    progress_bar.finish_with_message("Done processing files");
 
-    let exclusive_kmers = Arc::try_unwrap(shared_exclusive)
-        .unwrap()
-        .into_inner()
-        .unwrap();
+    // Sequential subtraction, pipelined with parallel extraction above
+    for file_kmers in rx {
+        for kmer in &file_kmers {
+            exclusive_kmers.remove(kmer);
+        }
+        // file_kmers dropped here — no accumulation
+    }
+    extraction_handle.join().expect("k-mer extraction thread panicked");
+    progress_bar.finish_with_message("Done processing files");
 
     println!("Found {} exclusive k-mers", exclusive_kmers.len());
     Ok(exclusive_kmers)
@@ -951,60 +966,66 @@ pub fn check_primer_specificity_candidates(
                     // Aligner maximizes score. Levenshtein minimizes distance.
                     // To approximate Levenshtein: Match=0, Subst=-1, Gap=-1.
                     // But Aligner usually uses positive match. Match=1, Subst=-1, Gap=-1.
-                    let score = |a: u8, b: u8| if a == b { 1i32 } else { -1i32 };
-                    let mut aligner = Aligner::with_capacity(region_len, target_window.len(), -1, -1, score);
-                    let alignment = aligner.semiglobal(region_seq, target_window);
-                    
-                    // Map primer coordinates using alignment path
-                    let check_primer = |p_offset: usize, p_seq: &str| -> bool {
-                        let p_len = p_seq.len();
-                        let p_end_offset = p_offset + p_len;
-                        
-                        let mut t_start_idx = None;
-                        let mut t_end_idx = None;
-                        
-                        let mut x = alignment.xstart; // region index
-                        let mut y = alignment.ystart; // window index
-                        
-                        // If alignment starts after primer (clipping), we consider it mismatch?
-                        if x > p_offset { return false; }
+                    // Perform Semiglobal Alignment using the thread-local Aligner.
+                    // Avoids allocating a fresh DP scoring matrix for every candidate-target pair.
+                    // check_primer is defined inside the with() callback so that `alignment`
+                    // (a reference into the Aligner's internal state) stays valid for both calls.
+                    let (l_nonspecific, r_nonspecific) = THREAD_ALIGNER.with(|cell| {
+                        let mut aligner = cell.borrow_mut();
+                        let alignment = aligner.semiglobal(region_seq, target_window);
 
-                        let mut covered = false;
+                        // Map primer coordinates using alignment path
+                        let check_primer = |p_offset: usize, p_seq: &str| -> bool {
+                            let p_len = p_seq.len();
+                            let p_end_offset = p_offset + p_len;
 
-                        for op in &alignment.operations {
-                             if x == p_offset { t_start_idx = Some(y); }
-                             if x == p_end_offset { t_end_idx = Some(y); covered = true; break; }
-                             
-                             match op {
-                                 AlignmentOperation::Match | AlignmentOperation::Subst => {
-                                     x += 1; y += 1;
-                                 },
-                                 AlignmentOperation::Ins => { y += 1; },
-                                 AlignmentOperation::Del => { x += 1; },
-                                 _ => {}
-                             }
-                        }
-                        if x == p_end_offset { t_end_idx = Some(y); covered = true; }
-                        
-                        if let (Some(ts), Some(te)) = (t_start_idx, t_end_idx) {
-                             if te > target_window.len() { return false; }
-                             let t_slice = &target_window[ts..te];
-                             // Calculate mismatch distance
-                             // Use bounded_levenshtein for exact distance check
-                             if let Some(dist) = bounded_levenshtein(p_seq.as_bytes(), t_slice, local_mismatch_threshold as u32 + 1) {
-                                 return dist < local_mismatch_threshold as u32; // Specific if dist >= threshold
-                                 // Return TRUE if NonSpecific (match found)
-                             }
-                        }
-                        false // Default to Specific if mapping fails
-                    };
-                    
-                    let l_nonspecific = check_primer(candidate.left_primer_offset, &candidate.left_primer_seq);
-                    let r_nonspecific = check_primer(candidate.right_primer_offset, &candidate.right_primer_seq);
-                    
+                            let mut t_start_idx = None;
+                            let mut t_end_idx = None;
+
+                            let mut x = alignment.xstart; // region index
+                            let mut y = alignment.ystart; // window index
+
+                            // If alignment starts after primer (clipping), we consider it mismatch?
+                            if x > p_offset { return false; }
+
+                            let mut covered = false;
+
+                            for op in &alignment.operations {
+                                if x == p_offset { t_start_idx = Some(y); }
+                                if x == p_end_offset { t_end_idx = Some(y); covered = true; break; }
+
+                                match op {
+                                    AlignmentOperation::Match | AlignmentOperation::Subst => {
+                                        x += 1; y += 1;
+                                    },
+                                    AlignmentOperation::Ins => { y += 1; },
+                                    AlignmentOperation::Del => { x += 1; },
+                                    _ => {}
+                                }
+                            }
+                            if x == p_end_offset { t_end_idx = Some(y); covered = true; }
+
+                            if let (Some(ts), Some(te)) = (t_start_idx, t_end_idx) {
+                                if te > target_window.len() { return false; }
+                                let t_slice = &target_window[ts..te];
+                                // Calculate mismatch distance
+                                // Use bounded_levenshtein for exact distance check
+                                if let Some(dist) = bounded_levenshtein(p_seq.as_bytes(), t_slice, local_mismatch_threshold as u32 + 1) {
+                                    return dist < local_mismatch_threshold as u32; // Specific if dist >= threshold
+                                    // Return TRUE if NonSpecific (match found)
+                                }
+                            }
+                            false // Default to Specific if mapping fails
+                        };
+
+                        let l = check_primer(candidate.left_primer_offset, &candidate.left_primer_seq);
+                        let r = check_primer(candidate.right_primer_offset, &candidate.right_primer_seq);
+                        (l, r)
+                    });
+
                     if l_nonspecific && r_nonspecific {
                          found_nonspecific = true;
-                         // We continue loop to improve min_distance statistics, 
+                         // We continue loop to improve min_distance statistics,
                          // but we already know tag is NonSpecific.
                     }
                 }
