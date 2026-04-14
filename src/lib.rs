@@ -12,6 +12,7 @@ use bio::alignment::distance::simd::bounded_levenshtein;
 use bio::pattern_matching::myers::long::Myers;
 use bio::alignment::pairwise::Aligner;
 use bio::alignment::AlignmentOperation;
+use console::style;
 
 /// Scoring function for semiglobal DNA alignment.
 /// Defined as a named fn so it can be used as a `fn` pointer in `thread_local!`.
@@ -258,24 +259,31 @@ pub fn get_exclusive_kmers(
         .num_threads(num_threads)
         .build_global();
 
-    // Extract k-mers from reference sequence with counting
+    // -- Step 1: scan reference and count k-mers ----------------------------
     let spinner = indicatif::ProgressBar::new_spinner();
     spinner.set_style(
         indicatif::ProgressStyle::default_spinner()
-            .template("{spinner} {msg}")
+            .template("{spinner:.cyan} {msg}")
             .unwrap()
             .tick_strings(&[
-                "🔍 A ",
-                "🔍 C ",
-                "🔍 G ",
-                "🔍 T ",
+                "-", "\\", "|", "/",
             ]),
     );
-    spinner.set_message("Extracting and counting k-mers from reference sequence...");
-    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+    spinner.set_message(format!(
+        "{} Scanning reference for {}-mers...",
+        style("[1/3]").bold().cyan(),
+        style(k).bold()
+    ));
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
     let reference_counts = count_kmers_from_reference(reference_path, k)?;
-    spinner.finish_with_message(format!("Extracted {} unique k-mers from reference", reference_counts.len()));
+    spinner.finish_with_message(format!(
+        "{} {}  --  {} unique {}-mers found in reference",
+        style("[1/3]").bold().cyan(),
+        style("Done").bold().green(),
+        style(reference_counts.len()).bold().white(),
+        k
+    ));
     
     // Filter k-mers that exceed max abundance in reference
     let mut exclusive_kmers: FxHashSet<u64> = reference_counts
@@ -286,9 +294,9 @@ pub fn get_exclusive_kmers(
     exclusive_kmers.shrink_to_fit();
 
     println!(
-        "Found {} suitable k-mers in reference (abundance <= {})", 
-        exclusive_kmers.len(), 
-        max_abundance
+        "      After abundance filter (<= {})  --  {} candidate k-mers retained",
+        style(max_abundance).bold(),
+        style(exclusive_kmers.len()).bold().white()
     );
 
     // Get all FASTA files
@@ -305,18 +313,20 @@ pub fn get_exclusive_kmers(
         .collect();
 
     println!(
-        "Processing {} sequence files with {} threads...",
-        fasta_files.len(),
-        num_threads
+        "\n{} Subtracting k-mers  --  {} comparison file(s)  |  {} thread(s)",
+        style("[2/3]").bold().cyan(),
+        style(fasta_files.len()).bold(),
+        style(num_threads).bold()
     );
 
     let progress_bar = indicatif::ProgressBar::new(fasta_files.len() as u64);
     progress_bar.set_style(
         indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({eta}) {msg}")
+            .template("    {prefix:.bold}  [{elapsed_precise}] {bar:35.cyan/blue} {pos:>3}/{len} files  {eta} remaining")
             .unwrap()
-            .progress_chars("#>-"),
+            .progress_chars("=>-"),
     );
+    progress_bar.set_prefix("Subtracting");
 
     // LOCK-FREE PIPELINE: Rayon extracts k-mers from all files in parallel on a
     // dedicated thread. The calling thread drains the channel and subtracts in-place,
@@ -334,7 +344,12 @@ pub fn get_exclusive_kmers(
                     let _ = tx.send(file_kmers);
                 }
                 Err(e) => {
-                    bar_clone.println(format!("Error processing {:?}: {}", seq_path, e));
+                    bar_clone.println(format!(
+                        "    {}: Error processing {:?}: {}",
+                        style("WARNING").bold().yellow(),
+                        seq_path,
+                        e
+                    ));
                 }
             }
         });
@@ -349,9 +364,14 @@ pub fn get_exclusive_kmers(
         // file_kmers dropped here — no accumulation
     }
     extraction_handle.join().expect("k-mer extraction thread panicked");
-    progress_bar.finish_with_message("Done processing files");
+    progress_bar.finish_with_message("");
+    progress_bar.finish_and_clear();
 
-    println!("Found {} exclusive k-mers", exclusive_kmers.len());
+    println!(
+        "      {} Subtraction done  --  {} exclusive k-mers remaining",
+        style("Done.").bold().green(),
+        style(exclusive_kmers.len()).bold().white()
+    );
     Ok(exclusive_kmers)
 }
 
@@ -540,18 +560,21 @@ pub fn process_reference_contigs(
     };
 
     println!(
-        "Processing {} contigs for exclusive regions (min length: {})...",
-        contig_count,
-        min_length
+        "\n{} Scanning {} contig(s) for exclusive regions  (k={}, min-len={} bp)...",
+        style("[2/3]").bold().cyan(),
+        style(contig_count).bold(),
+        style(k).bold(),
+        style(min_length).bold()
     );
-    
+
     let progress_bar = indicatif::ProgressBar::new(contig_count);
     progress_bar.set_style(
         indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} ({eta}) {msg}")
+            .template("    {prefix:.bold}  [{elapsed_precise}] {bar:35.cyan/blue} {pos:>5}/{len} contigs  {eta} remaining")
             .unwrap()
-            .progress_chars("#>-"),
+            .progress_chars("=>-"),
     );
+    progress_bar.set_prefix("Scanning  ");
 
     // Open output files once
     let mut regions_file = File::create(regions_output_path)?;
@@ -623,12 +646,14 @@ pub fn process_reference_contigs(
         progress_bar.inc(1);
     }
 
-    progress_bar.finish_with_message("Done processing contigs");
-    println!("Regions summary written to: {:?}", regions_output_path);
+    progress_bar.finish_and_clear();
     println!(
-        "Extracted {} exclusive regions to FASTA: {:?}",
-        total_fasta_regions, fasta_output_path
+        "      {} Contig scan done  --  {} exclusive region(s) extracted",
+        style("Done.").bold().green(),
+        style(total_fasta_regions).bold().white()
     );
+    println!("      Regions report  -->  {}", style(regions_output_path.display()).cyan());
+    println!("      Regions FASTA   -->  {}", style(fasta_output_path.display()).cyan());
 
     Ok(all_contig_regions)
 }
@@ -888,20 +913,21 @@ pub fn check_primer_specificity_candidates(
     local_mismatch_threshold: u32,
 ) -> Vec<PrimerSpecificityResult> {
 
-    
     println!(
-        "Checking specificity for {} primer candidates against {} targets...",
-        candidates.len(),
-        target_sequences.len()
+        "\n{} Specificity check  --  {} candidate(s)  x  {} target sequence(s)",
+        style("[3/3]").bold().cyan(),
+        style(candidates.len()).bold(),
+        style(target_sequences.len()).bold()
     );
 
     let progress_bar = indicatif::ProgressBar::new(candidates.len() as u64);
     progress_bar.set_style(
         indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.green/white} {pos}/{len} ({eta}) {msg}")
+            .template("    {prefix:.bold}  [{elapsed_precise}] {bar:35.green/white} {pos:>5}/{len} primers  {eta} remaining  ({per_sec})")
             .unwrap()
-            .progress_chars("█▓░"),
+            .progress_chars("#>-"),
     );
+    progress_bar.set_prefix("Checking  ");
 
     let results: Vec<PrimerSpecificityResult> = candidates
         .par_iter()
@@ -1060,13 +1086,16 @@ pub fn check_primer_specificity_candidates(
         })
         .collect();
         
-    progress_bar.finish_with_message("Specificity check complete");
-    
-    // Summary output
-    let unique = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Unique_LowSim).count();
+    progress_bar.finish_and_clear();
+
+    // -- Summary -------------------------------------------------------------
+    let unique          = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Unique_LowSim).count();
     let specific_in_sim = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Specific_In_SimRegion).count();
-    let nonspecific = results.iter().filter(|r| r.tag == PrimerSpecificityTag::NonSpecific_HighSim).count();
-    println!("Results: {} Unique, {} Specific in Sim, {} NonSpecific", unique, specific_in_sim, nonspecific);
+    let nonspecific     = results.iter().filter(|r| r.tag == PrimerSpecificityTag::NonSpecific_HighSim).count();
+    println!("      {} Specificity check done:", style("Done.").bold().green());
+    println!("        Unique (low similarity)      {}", style(unique).bold().white());
+    println!("        Specific in similar region   {}", style(specific_in_sim).bold().white());
+    println!("        Non-specific (high sim hit)  {}", style(nonspecific).bold().white());
     
     results
 }
@@ -1144,7 +1173,10 @@ fn check_specificity<'py>(
         let target_sequences = load_sequences_from_directory(&sequences_dir)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        println!("Loaded {} target sequences for specificity check", target_sequences.len());
+        println!(
+            "      Loaded {} target sequence(s) from disk",
+            style(target_sequences.len()).bold().white()
+        );
 
         // Run specificity check
         let results = check_primer_specificity_candidates(

@@ -231,6 +231,7 @@ name = "diffprimer"
 version = "0.1.0"
 dependencies = [
  "bio",
+ "console",
  "fxhash",
  "indicatif",
  "num_cpus",

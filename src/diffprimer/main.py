@@ -151,7 +151,7 @@ def main(
         if detected is None:
             raise RuntimeError(logger.error("Could not detect number of CPUs available. Please specify --cpus manually."))
         cpus = detected - 1
-    logger.info(f"Using {cpus} CPU cores for parallel processing.")
+    logger.info(f"Using [bold white]{cpus}[/bold white] CPU core(s) for parallel processing.")
     
     input_file = os.path.abspath(sequences_path)
     results_dir = os.path.join(os.path.dirname(input_file), "results")
@@ -160,8 +160,9 @@ def main(
     logger.info("Loading annotation file...")
     try:
         df_annotation = annotation_dataframe(annotation_path)
+        logger.info("[bold green]Done.[/bold green] Annotation file loaded.")
     except Exception as e:
-         logger.warning(f"Could not load annotation file: {e}")
+         logger.warning(f"Could not load annotation file: [bold yellow]{e}[/bold yellow] -- proceeding without annotations.")
          df_annotation = None
 
     os.makedirs(results_dir, exist_ok=True)
@@ -194,28 +195,31 @@ def main(
         regions_data = [{"start": r.start, "end": r.end, "subsequence": r.subsequence} for r in contig.regions]
         contig_data_list.append((contig.header, regions_data))
 
-    logger.info(f"Designing primers for {len(contig_data_list)} contigs using {cpus} workers...")
+    logger.info(
+        f"Designing primers for [bold white]{len(contig_data_list)}[/bold white] contig(s) "
+        f"using [bold white]{cpus}[/bold white] worker(s)..."
+    )
 
     # Collect all designed primers first
     designed_primers_list = []
 
     with multiprocessing.Pool(processes=cpus) as pool:
-        # Use partial to pass constant global_args
         worker_func = partial(design_primers_for_contig, global_args=global_args)
-        
+
         with _make_progress(total=True) as progress:
-            task = progress.add_task("[green]Designing primers...", total=len(contig_data_list))
-            
-            # Use imap to get results as they complete
+            task = progress.add_task("Designing primers", total=len(contig_data_list))
+
             for batch_results in pool.imap_unordered(worker_func, contig_data_list):
                 for item in batch_results:
                     designed_primers_list.append(item)
                 progress.advance(task)
 
-    # NEW: Specificity Check
+    # Specificity check
     spec_map = {}
     if check_specificity and designed_primers_list:
-        logger.info(f"Checking specificity for {len(designed_primers_list)} primer candidates...")
+        logger.info(
+            f"Checking specificity for [bold white]{len(designed_primers_list)}[/bold white] primer candidate(s)..."
+        )
         
         candidates = []
         for item in designed_primers_list:
@@ -273,26 +277,26 @@ def main(
             
             # Create lookup map
             spec_map = {res.region_header: res for res in specificity_results}
-            logger.info("Specificity analysis completed successfully.")
+            logger.info("[bold green]Done.[/bold green] Specificity analysis complete.")
             
         except Exception as e:
-            logger.error(f"Specificity check failed: {e}")
+            logger.error(f"Specificity check failed: [bold yellow]{e}[/bold yellow]")
             spec_map = {}
 
     elif not designed_primers_list:
-        logger.warning("No primers designed.")
+        logger.warning("No primers were designed -- check input sequences and Primer3 configuration.")
         spec_map = {}
 
     # Write Results to CSV
     logger.info("Writing results to CSV...")
     with _make_progress(total=True) as progress:
-        task = progress.add_task("[green]Writing results to CSV...", total=len(designed_primers_list))
+        task = progress.add_task("Writing results", total=len(designed_primers_list))
         for item in designed_primers_list:
             header = item["header"]
             tag = "Not_Checked"
             if header in spec_map:
                 tag = str(spec_map[header].tag)
-                
+
             write_csv(
                 result_dict=item["result_dict"],
                 header=header,
@@ -303,4 +307,6 @@ def main(
             )
             progress.advance(task)
 
-    logger.info(f"Primer design completed. Results saved to {output_file}")
+    logger.info(
+        f"[bold green]Done.[/bold green] Results saved to [bold white]{output_file}[/bold white]"
+    )
