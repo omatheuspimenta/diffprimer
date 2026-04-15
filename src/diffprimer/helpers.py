@@ -73,19 +73,27 @@ def get_primers(sequence: str, global_args: dict) -> dict:
     amplicon_seq = sequence[L_start : R_end + 1]
     
     best_left = {
-        "COORDS": left_coords,
-        "SEQUENCE": design_result_dict.get("PRIMER_LEFT_0_SEQUENCE"),
-        "TM": design_result_dict.get("PRIMER_LEFT_0_TM"),
-        "PENALTY": design_result_dict.get("PRIMER_LEFT_0_PENALTY"),
-        "GC_PERCENT": design_result_dict.get("PRIMER_LEFT_0_GC_PERCENT")
-    }
-
+         "COORDS": left_coords,
+         "SEQUENCE": design_result_dict.get("PRIMER_LEFT_0_SEQUENCE"),
+         "TM": design_result_dict.get("PRIMER_LEFT_0_TM"),
+         "PENALTY": design_result_dict.get("PRIMER_LEFT_0_PENALTY"),
+         "GC_PERCENT": design_result_dict.get("PRIMER_LEFT_0_GC_PERCENT"),
+         "SELF_ANY_TH": design_result_dict.get("PRIMER_LEFT_0_SELF_ANY_TH"),
+         "SELF_END_TH": design_result_dict.get("PRIMER_LEFT_0_SELF_END_TH"),
+         "HAIRPIN_TH": design_result_dict.get("PRIMER_LEFT_0_HAIRPIN_TH"),
+         "END_STABILITY": design_result_dict.get("PRIMER_LEFT_0_END_STABILITY")
+     }
+ 
     best_right = {
         "COORDS": right_coords,
         "SEQUENCE": design_result_dict.get("PRIMER_RIGHT_0_SEQUENCE"),
         "TM": design_result_dict.get("PRIMER_RIGHT_0_TM"),
         "PENALTY": design_result_dict.get("PRIMER_RIGHT_0_PENALTY"),
-        "GC_PERCENT": design_result_dict.get("PRIMER_RIGHT_0_GC_PERCENT")
+        "GC_PERCENT": design_result_dict.get("PRIMER_RIGHT_0_GC_PERCENT"),
+        "SELF_ANY_TH": design_result_dict.get("PRIMER_RIGHT_0_SELF_ANY_TH"),
+        "SELF_END_TH": design_result_dict.get("PRIMER_RIGHT_0_SELF_END_TH"),
+        "HAIRPIN_TH": design_result_dict.get("PRIMER_RIGHT_0_HAIRPIN_TH"),
+        "END_STABILITY": design_result_dict.get("PRIMER_RIGHT_0_END_STABILITY")
     }
 
     return {
