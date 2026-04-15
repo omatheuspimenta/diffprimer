@@ -1,6 +1,6 @@
 [project]
 name = "diffprimer"
-version = "0.1.0"
+version = "0.1.1"
 description = "A tool to design primers that target specific variants in genomic sequences. Alingment-free and fast."
 readme = "README.md"
 authors = [

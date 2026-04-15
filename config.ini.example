@@ -33,7 +33,7 @@ PRIMER_MAX_GC = 60.0
 PRIMER_OPT_GC = 50.0
 
 # ==============================================================================
-# STRICT START AND END CLAMPS (CRITICAL FIX)
+# STRICT START AND END CLAMPS
 # ==============================================================================
 
 # 1. START of Primer (5' End)
@@ -72,4 +72,4 @@ PRIMER_DNA_CONC = 50.0
 PRIMER_MAX_NS_ACCEPTED = 0
 
 # Range as list of lists [[min, max]]
-PRIMER_PRODUCT_SIZE_RANGE = [120, 200]
+PRIMER_PRODUCT_SIZE_RANGE = [100, 300]

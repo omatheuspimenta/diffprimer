@@ -127,7 +127,7 @@ The output is a CSV file containing one row per designed primer pair. Key column
 
 ## Configuration
 
-You can customize Primer3 settings by providing a file with `--config-file`. Example format:
+You can customize [Primer3 settings](https://primer3.org/manual.html) by providing a file with `--config-file`. Example format:
 ```
 PRIMER_OPT_SIZE=20
 PRIMER_MIN_SIZE=18

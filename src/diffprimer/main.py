@@ -138,8 +138,6 @@ def main(
         else:
             # If odd number of items, leave the right side empty
             p3_table.add_row(key1, str(val1), "", "")
-
-    # --- 3. Print Everything ---
     
 
     console.print(Panel(

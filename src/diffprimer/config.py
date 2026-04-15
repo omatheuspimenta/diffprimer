@@ -31,7 +31,7 @@ DEFAULT_CONFIG = {
     "PRIMER_SALT_MONOVALENT": 50.0,
     "PRIMER_DNA_CONC": 50.0,
     "PRIMER_MAX_NS_ACCEPTED": 0,
-    "PRIMER_PRODUCT_SIZE_RANGE": [120, 200]
+    "PRIMER_PRODUCT_SIZE_RANGE": [100,300] # default amplicon size range from primer3
 }
 
 def load_config(config_file: str | None = None) -> dict:

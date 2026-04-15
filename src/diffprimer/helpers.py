@@ -20,48 +20,80 @@ def get_primers(sequence: str, global_args: dict) -> dict:
         dict: A dictionary containing the best left and right primers, amplicon size, \
         and amplicon sequence.
     """
+    if not sequence or not isinstance(sequence, str):
+        logger.error("Invalid or empty sequence provided.")
+        return {
+            "best_left_primer": {}, "best_right_primer": {},
+            "amplicon_size": None, "amplicon_seq": "",
+        }
     
+    
+    sequence = sequence.upper()
     seq_args = {
         "SEQUENCE_ID": "region_of_interest",
         "SEQUENCE_TEMPLATE": sequence,
     }
 
-    design_result_dict = primer3.design_primers(
-        seq_args=seq_args,
-        global_args=global_args,
-    )
+    try:
+        design_result_dict = primer3.design_primers(
+            seq_args=seq_args,
+            global_args=global_args,
+        )
+    except Exception as e:
+        logger.error(f"Primer3 design failed for sequence: {e}")
+        design_result_dict = {}
+        
+    # Return empty results if no primers were found
+    num_returned = design_result_dict.get("PRIMER_PAIR_NUM_RETURNED", 0)
+    if num_returned == 0:
+        return {
+            "best_left_primer": {},
+            "best_right_primer": {},
+            "amplicon_size": None,
+            "amplicon_seq": "",
+        }
 
-    left_primers = design_result_dict.get("PRIMER_LEFT", False)
-    right_primers = design_result_dict.get("PRIMER_RIGHT", False)
+    # The best primers are the first one in the returned list based in primer3 penalities.
+    left_coords = design_result_dict.get("PRIMER_LEFT_0")   
+    right_coords = design_result_dict.get("PRIMER_RIGHT_0") 
 
-    # Select the best primer (lowest penalty)
-    best_left = min(left_primers, key=lambda x: x["PENALTY"]) if left_primers else {}
-    best_right = min(right_primers, key=lambda x: x["PENALTY"]) if right_primers else {}
+    if not left_coords or not right_coords:
+        logger.error("Primer3 returned >0 pairs but missing coordinates.")
+        return {
+            "best_left_primer": {},
+            "best_right_primer": {},
+            "amplicon_size": None,
+            "amplicon_seq": "",
+        }
 
-    if best_left and best_right:
-        # Correct amplicon length calculation
-        L_start = best_left["COORDS"][0]
-        R_end = best_right["COORDS"][0]
+    L_start = left_coords[0]
+    R_end = right_coords[0]
 
-        amplicon_size = R_end + 1 - L_start
-        amplicon_seq = sequence[L_start : R_end + best_right["COORDS"][1]]
-        # Ensure positive amplicon size
-        # If amplicon size is non-positive, check change the L_start and R_end to get the amplicon sequence
-        if amplicon_size <= 0:
-            amplicon_size = L_start + best_left["COORDS"][1] - R_end
-            amplicon_seq = sequence[R_end : L_start + best_left["COORDS"][1]]        
-    else:
-        amplicon_size = None
-        amplicon_seq = ""
+    amplicon_size = design_result_dict.get("PRIMER_PAIR_0_PRODUCT_SIZE")
+    amplicon_seq = sequence[L_start : R_end + 1]
+    
+    best_left = {
+        "COORDS": left_coords,
+        "SEQUENCE": design_result_dict.get("PRIMER_LEFT_0_SEQUENCE"),
+        "TM": design_result_dict.get("PRIMER_LEFT_0_TM"),
+        "PENALTY": design_result_dict.get("PRIMER_LEFT_0_PENALTY"),
+        "GC_PERCENT": design_result_dict.get("PRIMER_LEFT_0_GC_PERCENT")
+    }
 
-    result_dict = {
+    best_right = {
+        "COORDS": right_coords,
+        "SEQUENCE": design_result_dict.get("PRIMER_RIGHT_0_SEQUENCE"),
+        "TM": design_result_dict.get("PRIMER_RIGHT_0_TM"),
+        "PENALTY": design_result_dict.get("PRIMER_RIGHT_0_PENALTY"),
+        "GC_PERCENT": design_result_dict.get("PRIMER_RIGHT_0_GC_PERCENT")
+    }
+
+    return {
         "best_left_primer": best_left,
         "best_right_primer": best_right,
         "amplicon_size": amplicon_size,
         "amplicon_seq": amplicon_seq,
     }
-
-    return result_dict
 
 
 def annotation_dataframe(
