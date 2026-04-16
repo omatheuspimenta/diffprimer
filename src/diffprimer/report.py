@@ -53,10 +53,7 @@ def generate_html_report(results_dir: str):
             df[col] = "NA"
             
     # Combine parsed columns and expected columns for the table display
-    table_df = pd.concat([parsed_header_df, df[expected_cols].drop(columns=["Header"])], axis=1)
-    # Put Header as first column again for clarity
-    cols = ["Sequence_ID", "Region_ID", "Start", "End"] + [c for c in expected_cols if c != "Header"]
-    table_df = table_df[cols]
+    table_df = pd.concat([parsed_header_df, df[expected_cols]], axis=1)
     
     # Pre-compute data for charting
     # Amplicon Sizes (clean NA)
@@ -72,6 +69,15 @@ def generate_html_report(results_dir: str):
     right_tm = df.get("Right_TM", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
     left_gc = df.get("Left_GC", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
     right_gc = df.get("Right_GC", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    
+    # Hairpin and Dimerization (Boxplots)
+    left_hairpin = df.get("Left_HAIRPIN_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    right_hairpin = df.get("Right_HAIRPIN_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    left_self = df.get("Left_SELF_ANY_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    right_self = df.get("Right_SELF_ANY_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    
+    # Specificity similarity percentages for Histogram
+    max_sim_pct = df.get("Max_Similarity_pct", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
 
     # Generate HTML string
     html_content = f"""<!DOCTYPE html>
@@ -244,6 +250,28 @@ def generate_html_report(results_dir: str):
             vertical-align: middle;
         }}
         
+        .copy-btn {{
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            margin-left: 6px;
+            padding: 2px;
+            opacity: 0.5;
+            transition: opacity 0.2s, color 0.2s;
+            vertical-align: middle;
+            display: inline-flex;
+            align-items: center;
+        }}
+        .copy-btn:hover {{
+            opacity: 1;
+            color: var(--primary-color);
+        }}
+        .copy-btn svg {{
+            width: 14px;
+            height: 14px;
+        }}
+        
         .badge {{
             display: inline-block;
             padding: 4px 8px;
@@ -293,10 +321,18 @@ def generate_html_report(results_dir: str):
                 <div id="plot-amplicon"></div>
             </div>
             <div class="chart-box">
-                <h2>Specificity Distribution</h2>
+                <h2>Specificity Breakdown</h2>
                 <div id="plot-specificity"></div>
             </div>
-            <div class="chart-box" style="grid-column: 1 / -1; max-width: 800px; justify-self: center; width: 100%;">
+            <div class="chart-box">
+                <h2>Max Homology Similarity (%)</h2>
+                <div id="plot-homology"></div>
+            </div>
+            <div class="chart-box">
+                <h2>Dimerization Risks</h2>
+                <div id="plot-dimer"></div>
+            </div>
+            <div class="chart-box" style="grid-column: 1 / -1; max-width: 1000px; justify-self: center; width: 100%;">
                 <h2>Primer Parameter Space (Tm vs GC)</h2>
                 <div id="plot-tmgc"></div>
             </div>
@@ -311,16 +347,32 @@ def generate_html_report(results_dir: str):
                         <th>Region ID</th>
                         <th>Start</th>
                         <th>End</th>
+                        <th>Header</th>
                         <th>Forw Seq</th>
                         <th>Rev Seq</th>
-                        <th>Size</th>
-                        <th>Tag</th>
-                        <th>Target</th>
+                        <th>Amplicon Seq</th>
+                        <th>Amplicon Size</th>
+                        <th>Region Length</th>
+                        <th>Annotation</th>
+                        <th>Sequence Region</th>
+                        <th>Specificity Tag</th>
+                        <th>Most Similar Target</th>
                         <th>Max Sim%</th>
                     </tr>
                 </thead>
                 <tbody>
 """
+
+    def copy_cell(full_value, display_value, truncate=False):
+        if truncate:
+            display_html = f'<span class="seq-cell" title="{full_value}">{display_value}</span>'
+        else:
+            display_html = f'<span>{display_value}</span>'
+            
+        full_value_escaped = str(full_value).replace("'", "\\'")
+        copy_icon = '''<svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>'''
+        
+        return f'{display_html} <button class="copy-btn" onclick="copyText(this, \'{full_value_escaped}\')" title="Copy"> {copy_icon} </button>'
 
     # Populate rows
     for i, row in table_df.iterrows():
@@ -331,18 +383,26 @@ def generate_html_report(results_dir: str):
         elif "NonSpecific" in str(tag):
             badge_class = "nonspecific"
             
+        # Format the specific badge with a copy button
+        tag_html = f'<span class="badge {badge_class}">{tag}</span> <button class="copy-btn" onclick="copyText(this, \'{tag}\')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button>'
+            
         html_content += f"""
                     <tr>
-                        <td>{row.get("Sequence_ID", "")}</td>
-                        <td>{row.get("Region_ID", "")}</td>
-                        <td>{row.get("Start", "")}</td>
-                        <td>{row.get("End", "")}</td>
-                        <td><span class="seq-cell" title="{row.get("Forw_Seq", "")}">{row.get("Forw_Seq", "")}</span></td>
-                        <td><span class="seq-cell" title="{row.get("Rev_Seq", "")}">{row.get("Rev_Seq", "")}</span></td>
-                        <td>{row.get("Amplicon_Size", "")}</td>
-                        <td><span class="badge {badge_class}">{tag}</span></td>
-                        <td>{row.get("Most_Similar_Target", "")}</td>
-                        <td>{row.get("Max_Similarity_pct", "")}</td>
+                        <td>{copy_cell(row.get("Sequence_ID", ""), row.get("Sequence_ID", ""))}</td>
+                        <td>{copy_cell(row.get("Region_ID", ""), row.get("Region_ID", ""))}</td>
+                        <td>{copy_cell(row.get("Start", ""), row.get("Start", ""))}</td>
+                        <td>{copy_cell(row.get("End", ""), row.get("End", ""))}</td>
+                        <td>{copy_cell(row.get("Header", ""), row.get("Header", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Forw_Seq", ""), row.get("Forw_Seq", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Rev_Seq", ""), row.get("Rev_Seq", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Amplicon_Seq", ""), row.get("Amplicon_Seq", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Amplicon_Size", ""), row.get("Amplicon_Size", ""))}</td>
+                        <td>{copy_cell(row.get("Region_Length", ""), row.get("Region_Length", ""))}</td>
+                        <td>{copy_cell(row.get("Annotation", ""), row.get("Annotation", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Sequence_Region", ""), row.get("Sequence_Region", ""), truncate=True)}</td>
+                        <td>{tag_html}</td>
+                        <td>{copy_cell(row.get("Most_Similar_Target", ""), row.get("Most_Similar_Target", ""), truncate=True)}</td>
+                        <td>{copy_cell(row.get("Max_Similarity_pct", ""), row.get("Max_Similarity_pct", ""))}</td>
                     </tr>
 """
 
@@ -359,6 +419,20 @@ def generate_html_report(results_dir: str):
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     
     <script>
+        // Copy to clipboard functionality
+        function copyText(button, text) {{
+            navigator.clipboard.writeText(text).then(() => {{
+                const originalSvg = button.innerHTML;
+                // Checkmark svg
+                button.innerHTML = '<svg fill="currentColor" viewBox="0 0 20 20" style="color: #046c4e;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
+                setTimeout(() => {{
+                    button.innerHTML = originalSvg;
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy: ', err);
+            }});
+        }}
+
         $(document).ready( function () {{
             $('#primerTable').DataTable({{
                 pageLength: 25,
@@ -427,6 +501,45 @@ def generate_html_report(results_dir: str):
             xaxis: {{ title: 'GC Content (%)' }},
             yaxis: {{ title: 'Melting Temperature (Tm °C)' }},
             legend: {{ orientation: 'h', y: -0.2 }}
+        }});
+
+        // Plot 4: Max Similarity Homology Histogram
+        var trace_homology = {{
+            x: {json.dumps(max_sim_pct)},
+            type: 'histogram',
+            marker: {{ color: '#805ad5', line: {{ color: '#553c9a', width: 1 }} }},
+            opacity: 0.8
+        }};
+        Plotly.newPlot('plot-homology', [trace_homology], {{
+            ...layoutConfig,
+            xaxis: {{ title: 'Similarity to Off-Target (%)' }},
+            yaxis: {{ title: 'Count' }}
+        }});
+
+        // Plot 5: Dimerization & Hairpin Boxplot
+        var yData_dimer = {json.dumps(left_hairpin)}
+            .map(x => "F-Hairpin")
+            .concat({json.dumps(right_hairpin)}.map(x => "R-Hairpin"))
+            .concat({json.dumps(left_self)}.map(x => "F-Self"))
+            .concat({json.dumps(right_self)}.map(x => "R-Self"));
+            
+        var xData_dimer = {json.dumps(left_hairpin)}
+            .concat({json.dumps(right_hairpin)})
+            .concat({json.dumps(left_self)})
+            .concat({json.dumps(right_self)});
+
+        var trace_dimer = {{
+            x: xData_dimer,
+            y: yData_dimer,
+            type: 'box',
+            orientation: 'h',
+            marker: {{ color: '#4fd1c5' }},
+            line: {{ width: 1 }}
+        }};
+        Plotly.newPlot('plot-dimer', [trace_dimer], {{
+            ...layoutConfig,
+            xaxis: {{ title: 'Propensity Score' }},
+            margin: {{ t: 20, r: 20, b: 50, l: 80 }}
         }});
 
     </script>
