@@ -1048,12 +1048,22 @@ pub fn check_primer_specificity_candidates(
                         // using the alignment path. Mismatches at the 3' end of the
                         // primer (last 5 bases) are weighted 3× because they block
                         // polymerase extension, making the off-target safe.
+                        //
+                        // `is_reverse`: When true, the primer's 3' end is at the LEFT
+                        // side on the forward strand (low primer_pos), so the weighting
+                        // must be inverted. For a forward primer, 3' = high primer_pos.
                         #[allow(unused_variables, unused_assignments)]
-                        let check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> (bool, f64) {
+                        let check_primer = |p_start: usize, p_end: usize, _p_seq: &str, is_reverse: bool| -> (bool, f64) {
                             let primer_length = p_end - p_start;
-                            // 3' critical region: last 5 bases of the primer
-                            let three_prime_start = if primer_length > 5 { primer_length - 5 } else { 0 };
                             let local_threshold = local_mismatch_threshold as f64;
+
+                            // 3' critical region: last 5 bases of the actual primer.
+                            // For FWD primer: 3' is at the RIGHT (high primer_pos).
+                            //   → weight 3× when primer_pos >= primer_length - 5
+                            // For REV primer: 3' is at the LEFT (low primer_pos) on the
+                            //   forward strand, because the primer hybridizes 3'←5'.
+                            //   → weight 3× when primer_pos < 5
+                            let three_prime_size: usize = 5.min(primer_length);
 
                             let mut x = alignment.xstart; // region (query) index
                             let mut y = alignment.ystart; // window (target) index
@@ -1076,7 +1086,16 @@ pub fn check_primer_specificity_candidates(
                                 if x >= p_end { break; }
 
                                 if in_primer {
-                                    let weight = if primer_pos >= three_prime_start { 3.0 } else { 1.0 };
+                                    // Determine weight based on whether this position
+                                    // falls in the 3' critical region of the primer.
+                                    let in_three_prime = if is_reverse {
+                                        // REV primer: 3' end is at low primer_pos
+                                        primer_pos < three_prime_size
+                                    } else {
+                                        // FWD primer: 3' end is at high primer_pos
+                                        primer_pos >= primer_length - three_prime_size
+                                    };
+                                    let weight = if in_three_prime { 3.0 } else { 1.0 };
 
                                     match op {
                                         AlignmentOperation::Subst => {
@@ -1128,19 +1147,24 @@ pub fn check_primer_specificity_candidates(
                             (positional_mismatch_score < local_threshold, positional_mismatch_score)
                         };
 
+                        // Forward (left) primer: 3' end is at the right side
                         let l_start = candidate.left_primer_offset;
                         let l_end = l_start + candidate.left_primer_seq.len();
-                        let l = check_primer(l_start, l_end, &candidate.left_primer_seq);
+                        let l = check_primer(l_start, l_end, &candidate.left_primer_seq, false);
                         
+                        // Reverse (right) primer: 3' end is at the left side on FWD strand.
                         // Primer3 right primer offset is the HIGHEST 0-based index.
                         // So the sequence spans [r_offset + 1 - p_len .. r_offset + 1].
                         let r_end = candidate.right_primer_offset + 1;
                         let r_start = r_end.saturating_sub(candidate.right_primer_seq.len());
-                        let r = check_primer(r_start, r_end, &right_primer_forward);
+                        let r = check_primer(r_start, r_end, &right_primer_forward, true);
                         (l, r)
                     });
                     
-                    // Track the penalty scores from the most similar (worst-case) target
+                    // Track the penalty scores from the most similar (worst-case)
+                    // off-target. We do NOT break on the first non-specific hit —
+                    // we scan ALL targets to find the one with the lowest combined
+                    // penalty (most dangerous off-target) for accurate reporting.
                     let combined_score = l_score + r_score;
                     if combined_score < (best_left_penalty + best_right_penalty).min(f64::MAX) {
                         best_left_penalty = l_score;
@@ -1149,7 +1173,6 @@ pub fn check_primer_specificity_candidates(
 
                     if l_nonspecific && r_nonspecific {
                          found_nonspecific = true;
-                         break; // Fast exit! Primer pair is dead in this target
                     }
                 }
             }

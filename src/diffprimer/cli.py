@@ -1,5 +1,6 @@
 from diffprimer import __version__
 from diffprimer.main import main as _main
+from diffprimer.report import generate_html_report
 from rich.console import Console
 from typer import Context, Exit, Option, Typer
 from typing import Annotated
@@ -243,3 +244,31 @@ def run(
         similarity_threshold=similarity_threshold,
         local_mismatch_threshold=local_mismatch_threshold,
     )
+
+@app.command(rich_help_panel="diffprimer tools")
+def report(
+    results_dir: Annotated[
+        str,
+        Option(
+            "--results-dir",
+            "-d",
+            help=(
+                "Directory containing the diffprimer results (e.g. primer_design_results.csv)."
+            ),
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            readable=True,
+            resolve_path=True,
+            rich_help_panel="Input",
+        ),
+    ]
+) -> None:
+    """
+    Generate an interactive HTML report from diffprimer results.
+
+    This command parses the primer_design_results.csv file located in the 
+    specified results directory and creates a modern, standalone HTML report 
+    with visualizations and a searchable primer table.
+    """
+    generate_html_report(results_dir=results_dir)
