@@ -298,8 +298,15 @@ def main(
         for item in designed_primers_list:
             header = item["header"]
             tag = "Not_Checked"
+            target = "NA"
+            sim = "NA"
+            dist = "NA"
             if header in spec_map:
-                tag = str(spec_map[header].tag)
+                res = spec_map[header]
+                tag = str(res.tag)
+                target = res.most_similar_target if res.most_similar_target else "None"
+                sim = f"{res.max_similarity:.2f}"
+                dist = "NA" if res.local_distance == 4294967295 else str(res.local_distance) # u32::MAX is 4294967295
 
             write_csv(
                 result_dict=item["result_dict"],
@@ -307,7 +314,10 @@ def main(
                 sequence=item["sequence"],
                 df_annotation=df_annotation,
                 output_file=output_file,
-                specificity_tag=tag
+                specificity_tag=tag,
+                most_similar_target=target,
+                max_similarity=sim,
+                local_distance=dist
             )
             progress.advance(task)
 

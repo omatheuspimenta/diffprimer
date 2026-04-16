@@ -95,14 +95,21 @@ $$
 
 This accounts for all indels between the primer site and the region boundaries.
 
-**Final Specificity Test:**
-We compute the local Hamming/Levenshtein distance inside the mapped sites:
+**Final Specificity Test (Positional Mismatch Penalty):**
+Instead of a simple local edit distance, we apply a **positional weight** $\omega(x)$ to each mismatch, insertion, or deletion relative to the mapped primer sequence $P_{seq}$ of length $L_P$, favoring high specificity at the critical 3' end.
+Let $x \in [1, L_P]$ be the nucleotide position along the primer (5' to 3').
 
 $$
-\delta_{local} = \text{BoundedLev}(P_{seq}, W[y_{start}..y_{end}])
+\omega(x) = \begin{cases} 3.0 & \text{if } x \ge L_P - 5 \text{ (local 3' region)} \\ 1.0 & \text{otherwise} \end{cases}
 $$
 
-If $\delta_{local} \le T_{mismatch}$ (default 2 mismatches) for **both** forward and reverse primers, the amplicon is flagged as **NonSpecific** (potential false positive).
+The positional mismatch score $\delta_{pos}$ is accumulated during the alignment traversal over all editing operations:
+
+$$
+\delta_{pos} = \sum_{\text{op} \in \{\text{Subst}, \text{Ins}, \text{Del}\}} \omega(\text{pos}(\text{op}))
+$$
+
+If $\delta_{pos} < T_{mismatch}$ (where $T_{mismatch}$ is a user-configurable threshold, default 7.0) for **both** forward and reverse primers, the amplicon is flagged as **NonSpecific** (potential false positive). If the mismatch score exceeds the threshold for either primer, it is safely filtered as **Specific**.
 
 ---
 

@@ -181,7 +181,10 @@ def write_csv_header(output_file: str) -> None:
                     "Region_Length;"
                     "Annotation;"
                     "Sequence_Region;"
-                    "Specificity_Tag\n"
+                    "Specificity_Tag;"
+                    "Most_Similar_Target;"
+                    "Max_Similarity;"
+                    "Local_Distance\n"
                 )
     except Exception as e:
         raise RuntimeError(logger.error(f"Error writing CSV header: {e}"))
@@ -193,6 +196,9 @@ def write_csv(
     df_annotation: pd.DataFrame | None, # Accept loaded DF instead of path
     output_file: str,
     specificity_tag: str = "Not_Checked",
+    most_similar_target: str = "NA",
+    max_similarity: str = "NA",
+    local_distance: str = "NA",
 ) -> None:
     """
     Write primer design results to a CSV file.
@@ -232,5 +238,8 @@ def write_csv(
             f"{len(sequence)};"
             f"{annotation};"
             f"{sequence};"
-            f"{specificity_tag}\n"
+            f"{specificity_tag};"
+            f"{most_similar_target};"
+            f"{max_similarity};"
+            f"{local_distance}\n"
         )

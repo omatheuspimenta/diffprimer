@@ -40,6 +40,7 @@ diffprimer run \
 | `--kmer-size` | `-k` | K-mer size for uniqueness check (Default: 21). |
 | `--min-region-length` | `-m` | Minimum length of unique regions to keep (Default: 200 bp). |
 | `--check-specificity` | | **Highly Recommended.** Enables the rigorous cryptographic check of primer specificity. Without this, primers are only designed on unique regions but not physically verified against off-targets. |
+| `--local-mismatch-threshold` | | The score threshold for local mismatch positional penalty. Below this threshold, an off-target is considered non-specific. Penalty is 3.0 at 3' end and 1.0 elsewhere. (Default: 7.0) |
 
 ## Output Format
 
@@ -49,9 +50,9 @@ The output is a CSV file containing one row per designed primer pair. Key column
 -   `Region_Start`/`End`: Coordinates of the unique region.
 -   `Forward_Primer` / `Reverse_Primer` (and `_Tm`, `_GC`, etc.): Primer details.
 -   **`Specificity_Tag`**: The result of the specificity analysis (if `--check-specificity` is used).
-    -   `Unique_LowSim`: The region is globally unique; primers are safe.
-    -   `Specific_In_SimRegion`: The region has some similarity to background, but the primers *themselves* are specific (mismatch locally). **Safe to use.**
-    -   `NonSpecific_HighSim`: The primers bind perfectly to a similar region in a background genome. **Do NOT use.**
+    -   `Specific_LowGlobalSim`: The region is globally unique; primers are safe.
+    -   `Specific_PositionalMismatches`: The region has some similarity to background, but the primers *themselves* are specific due to sufficient positional mismatch penalties. **Safe to use.**
+    -   `NonSpecific_Amplification`: The primers bind closely to a similar region in a background genome (mismatch score < threshold). **Do NOT use.**
     -   `Not_Checked`: Specificity check was skipped.
 -   `Gene_Name` / `Product`: Annotation info (if GFF3 provided).
 

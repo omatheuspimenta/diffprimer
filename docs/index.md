@@ -15,6 +15,7 @@ It combines high-performance k-mer analysis with standard primer design tools (P
 -   **Specificity Check**:
     -   Validates designed primers against *all* input background genomes.
     -   Uses a hybrid **Myers Bit-Vector Algorithm** (Global) and **Semiglobal Alignment** (Local) to detect potential off-target amplification, even with insertions/deletions.
+    -   Applies dynamic **Positional Mismatch Weighting** to heavily penalize mismatches in the critical 3' binding end of the primers.
 -   **Annotation Integration**: Cross-references unique regions with GFF3 annotation files to identify which genes (if any) the markers overlap with.
 -   **Parallel Processing**: Fully parallelized core for fast execution on large datasets.
 
