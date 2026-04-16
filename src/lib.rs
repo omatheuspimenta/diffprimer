@@ -839,9 +839,14 @@ pub struct PrimerSpecificityResult {
     /// The header of the target sequence with the highest similarity.
     #[pyo3(get, set)]
     pub most_similar_target: String,
-    /// The local mismatch distance (number of edits) for the best match.
+    /// Weighted positional penalty score for the LEFT primer at the best off-target.
+    /// 0 = perfect binding (non-specific). Higher = more mismatches protecting specificity.
     #[pyo3(get, set)]
-    pub local_distance: u32,
+    pub left_primer_penalty: f64,
+    /// Weighted positional penalty score for the RIGHT primer at the best off-target.
+    /// 0 = perfect binding (non-specific). Higher = more mismatches protecting specificity.
+    #[pyo3(get, set)]
+    pub right_primer_penalty: f64,
 }
 
 #[pymethods]
@@ -855,7 +860,8 @@ impl PrimerSpecificityResult {
         tag: PrimerSpecificityTag,
         max_similarity: f64,
         most_similar_target: String,
-        local_distance: u32,
+        left_primer_penalty: f64,
+        right_primer_penalty: f64,
     ) -> Self {
         PrimerSpecificityResult {
             region_header,
@@ -864,20 +870,22 @@ impl PrimerSpecificityResult {
             tag,
             max_similarity,
             most_similar_target,
-            local_distance,
+            left_primer_penalty,
+            right_primer_penalty,
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "PrimerSpecificityResult(region='{}', start={}, end={}, tag={:?}, max_sim={:.2}%, target='{}', local_dist={})",
+            "PrimerSpecificityResult(region='{}', start={}, end={}, tag={:?}, max_sim={:.2}%, target='{}', L_penalty={:.1}, R_penalty={:.1})",
             self.region_header,
             self.region_start,
             self.region_end,
             self.tag,
             self.max_similarity,
             self.most_similar_target,
-            self.local_distance,
+            self.left_primer_penalty,
+            self.right_primer_penalty,
         )
     }
 }
@@ -963,7 +971,8 @@ pub fn check_primer_specificity_candidates(
             let mut min_distance: usize = usize::MAX;
             let mut best_target_match: Option<(&str, usize)> = None; // (target_header, distance)
             let mut found_nonspecific = false;
-            let mut best_local_distance: f64 = f64::MAX;
+            let mut best_left_penalty: f64 = f64::MAX;
+            let mut best_right_penalty: f64 = f64::MAX;
 
             // Iterate ALL targets
             for (target_header, target_bytes) in target_sequences {
@@ -1040,7 +1049,7 @@ pub fn check_primer_specificity_candidates(
                         // primer (last 5 bases) are weighted 3× because they block
                         // polymerase extension, making the off-target safe.
                         #[allow(unused_variables, unused_assignments)]
-                        let mut check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> (bool, f64) {
+                        let check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> (bool, f64) {
                             let primer_length = p_end - p_start;
                             // 3' critical region: last 5 bases of the primer
                             let three_prime_start = if primer_length > 5 { primer_length - 5 } else { 0 };
@@ -1131,9 +1140,11 @@ pub fn check_primer_specificity_candidates(
                         (l, r)
                     });
                     
+                    // Track the penalty scores from the most similar (worst-case) target
                     let combined_score = l_score + r_score;
-                    if combined_score < best_local_distance {
-                        best_local_distance = combined_score;
+                    if combined_score < (best_left_penalty + best_right_penalty).min(f64::MAX) {
+                        best_left_penalty = l_score;
+                        best_right_penalty = r_score;
                     }
 
                     if l_nonspecific && r_nonspecific {
@@ -1155,7 +1166,8 @@ pub fn check_primer_specificity_candidates(
             };
             
             let most_similar_target = best_target_match.map(|(h, _)| h.to_string()).unwrap_or_default();
-            let local_distance = if best_local_distance == f64::MAX { u32::MAX } else { best_local_distance as u32 };
+            let left_penalty = if best_left_penalty == f64::MAX { -1.0 } else { best_left_penalty };
+            let right_penalty = if best_right_penalty == f64::MAX { -1.0 } else { best_right_penalty };
 
             let result = PrimerSpecificityResult {
                 region_header: candidate.header.clone(),
@@ -1164,7 +1176,8 @@ pub fn check_primer_specificity_candidates(
                 tag,
                 max_similarity,
                 most_similar_target,
-                local_distance,
+                left_primer_penalty: left_penalty,
+                right_primer_penalty: right_penalty,
             };
 
             progress_bar.inc(1);

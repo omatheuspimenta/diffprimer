@@ -300,17 +300,21 @@ def main(
             tag = "Not_Checked"
             target = "NA"
             sim = "NA"
-            dist = "NA"
+            l_penalty = "NA"
+            r_penalty = "NA"
             if header in spec_map:
                 res = spec_map[header]
                 tag = str(res.tag)
                 target = res.most_similar_target if res.most_similar_target else "None"
                 if tag == "Specific_LowGlobalSim":
+                    # No off-target hit above similarity threshold — no local analysis performed
                     sim = "NA"
-                    dist = "NA"
+                    l_penalty = "NA"
+                    r_penalty = "NA"
                 else:
                     sim = f"{res.max_similarity:.2f}"
-                    dist = "NA" if res.local_distance == 4294967295 else str(res.local_distance) # u32::MAX is 4294967295
+                    l_penalty = f"{res.left_primer_penalty:.1f}" if res.left_primer_penalty >= 0 else "NA"
+                    r_penalty = f"{res.right_primer_penalty:.1f}" if res.right_primer_penalty >= 0 else "NA"
 
             write_csv(
                 result_dict=item["result_dict"],
@@ -321,7 +325,8 @@ def main(
                 specificity_tag=tag,
                 most_similar_target=target,
                 max_similarity=sim,
-                local_distance=dist
+                left_positional_penalty=l_penalty,
+                right_positional_penalty=r_penalty
             )
             progress.advance(task)
 
