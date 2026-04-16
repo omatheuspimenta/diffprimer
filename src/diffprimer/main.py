@@ -305,8 +305,12 @@ def main(
                 res = spec_map[header]
                 tag = str(res.tag)
                 target = res.most_similar_target if res.most_similar_target else "None"
-                sim = f"{res.max_similarity:.2f}"
-                dist = "NA" if res.local_distance == 4294967295 else str(res.local_distance) # u32::MAX is 4294967295
+                if tag == "Specific_LowGlobalSim":
+                    sim = "NA"
+                    dist = "NA"
+                else:
+                    sim = f"{res.max_similarity:.2f}"
+                    dist = "NA" if res.local_distance == 4294967295 else str(res.local_distance) # u32::MAX is 4294967295
 
             write_csv(
                 result_dict=item["result_dict"],

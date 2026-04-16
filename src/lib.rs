@@ -963,6 +963,7 @@ pub fn check_primer_specificity_candidates(
             let mut min_distance: usize = usize::MAX;
             let mut best_target_match: Option<(&str, usize)> = None; // (target_header, distance)
             let mut found_nonspecific = false;
+            let mut best_local_distance: f64 = f64::MAX;
 
             // Iterate ALL targets
             for (target_header, target_bytes) in target_sequences {
@@ -1030,7 +1031,7 @@ pub fn check_primer_specificity_candidates(
                     // Avoids allocating a fresh DP scoring matrix for every candidate-target pair.
                     // check_primer is defined inside the with() callback so that `alignment`
                     // (a reference into the Aligner's internal state) stays valid for both calls.
-                    let (l_nonspecific, r_nonspecific) = THREAD_ALIGNER.with(|cell| {
+                    let ((l_nonspecific, l_score), (r_nonspecific, r_score)) = THREAD_ALIGNER.with(|cell| {
                         let mut aligner = cell.borrow_mut();
                         let alignment = aligner.semiglobal(region_seq, &target_window);
 
@@ -1039,7 +1040,7 @@ pub fn check_primer_specificity_candidates(
                         // primer (last 5 bases) are weighted 3× because they block
                         // polymerase extension, making the off-target safe.
                         #[allow(unused_variables, unused_assignments)]
-                        let check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> bool {
+                        let mut check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> (bool, f64) {
                             let primer_length = p_end - p_start;
                             // 3' critical region: last 5 bases of the primer
                             let three_prime_start = if primer_length > 5 { primer_length - 5 } else { 0 };
@@ -1053,7 +1054,7 @@ pub fn check_primer_specificity_candidates(
 
                             // If alignment starts after the primer region, the entire
                             // primer is clipped — treat as specific (safe off-target).
-                            if x > p_start { return false; }
+                            if x > p_start { return (false, positional_mismatch_score); }
 
                             for op in &alignment.operations {
                                 // Detect entry into the primer region
@@ -1098,7 +1099,7 @@ pub fn check_primer_specificity_candidates(
                                     // Short-circuit: score already exceeds threshold
                                     // → this off-target is safe, primer is specific here
                                     if positional_mismatch_score >= local_threshold {
-                                        return false;
+                                        return (false, positional_mismatch_score);
                                     }
                                 } else {
                                     // Outside primer region — just advance coordinates
@@ -1115,7 +1116,7 @@ pub fn check_primer_specificity_candidates(
 
                             // If we finish the loop and score is below threshold,
                             // this is a dangerously similar off-target (non-specific).
-                            positional_mismatch_score < local_threshold
+                            (positional_mismatch_score < local_threshold, positional_mismatch_score)
                         };
 
                         let l_start = candidate.left_primer_offset;
@@ -1129,6 +1130,11 @@ pub fn check_primer_specificity_candidates(
                         let r = check_primer(r_start, r_end, &right_primer_forward);
                         (l, r)
                     });
+                    
+                    let combined_score = l_score + r_score;
+                    if combined_score < best_local_distance {
+                        best_local_distance = combined_score;
+                    }
 
                     if l_nonspecific && r_nonspecific {
                          found_nonspecific = true;
@@ -1149,7 +1155,7 @@ pub fn check_primer_specificity_candidates(
             };
             
             let most_similar_target = best_target_match.map(|(h, _)| h.to_string()).unwrap_or_default();
-            let local_distance = if min_distance == usize::MAX { u32::MAX } else { min_distance as u32 };
+            let local_distance = if best_local_distance == f64::MAX { u32::MAX } else { best_local_distance as u32 };
 
             let result = PrimerSpecificityResult {
                 region_header: candidate.header.clone(),
