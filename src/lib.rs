@@ -8,7 +8,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::cell::RefCell;
-use bio::alignment::distance::simd::bounded_levenshtein;
+
 use bio::pattern_matching::myers::long::Myers;
 use bio::alignment::pairwise::Aligner;
 use bio::alignment::AlignmentOperation;
@@ -32,6 +32,18 @@ const A: u64 = 0b00;
 const C: u64 = 0b01;
 const G: u64 = 0b10;
 const T: u64 = 0b11;
+
+/// Computes the reverse complement of a DNA sequence.
+fn reverse_complement(seq: &str) -> String {
+    seq.chars().rev().map(|c| match c {
+        'A' | 'a' => 'T',
+        'T' | 't' => 'A',
+        'C' | 'c' => 'G',
+        'G' | 'g' => 'C',
+        _ => c,
+    }).collect()
+}
+
 
 /// A struct representing a k-mer (substring of length k) encoded as a 2-bit integer.
 #[derive(Clone, Copy, Debug)]
@@ -782,21 +794,21 @@ impl PrimerCandidate {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum PrimerSpecificityTag {
-    /// Global similarity below threshold - primer is likely specific (safe)
-    Unique_LowSim,
-    /// High global similarity AND primer region is conserved - risk of false positive
-    NonSpecific_HighSim,
-    /// High global similarity BUT primer region has significant gaps/mismatches (safe)
-    Specific_In_SimRegion,
+    /// Global similarity below threshold - amplicon region is globally unique (specific)
+    Specific_LowGlobalSim,
+    /// High global similarity AND primers can amplify (cross-reactive) - non-specific
+    NonSpecific_Amplification,
+    /// High global similarity BUT 3'/5' positional mismatches protect against amplification (specific)
+    Specific_PositionalMismatches,
 }
 
 #[pymethods]
 impl PrimerSpecificityTag {
     fn __repr__(&self) -> String {
         match self {
-            PrimerSpecificityTag::Unique_LowSim => "Unique_LowSim".to_string(),
-            PrimerSpecificityTag::NonSpecific_HighSim => "NonSpecific_HighSim".to_string(),
-            PrimerSpecificityTag::Specific_In_SimRegion => "Specific_In_SimRegion".to_string(),
+            PrimerSpecificityTag::Specific_LowGlobalSim => "Specific_LowGlobalSim".to_string(),
+            PrimerSpecificityTag::NonSpecific_Amplification => "NonSpecific_Amplification".to_string(),
+            PrimerSpecificityTag::Specific_PositionalMismatches => "Specific_PositionalMismatches".to_string(),
         }
     }
     
@@ -934,30 +946,45 @@ pub fn check_primer_specificity_candidates(
         .map(|candidate| {
             let region_seq = candidate.region_sequence.as_bytes();
             let region_len = region_seq.len();
+
+            // Make reverse complement 
+            let right_primer_forward = reverse_complement(&candidate.right_primer_seq);
             
             // 1. Calculate max allowed distance (Global Similarity Threshold)
             let max_allowed_distance = ((region_len as f64) * (1.0 - similarity_threshold / 100.0)) as usize;
             
             // 2. Myers Bit-Vector Algorithm for Global Search
             // Using long::Myers for arbitrary length patterns
-            let myers = Myers::<u64>::new(region_seq);
+            let myers_fwd = Myers::<u64>::new(region_seq);
+            let region_seq_rc_str = reverse_complement(&candidate.region_sequence);
+            let region_seq_rc = region_seq_rc_str.as_bytes();
+            let myers_rev = Myers::<u64>::new(region_seq_rc);
             
             let mut min_distance: usize = usize::MAX;
             let mut best_target_match: Option<(&str, usize)> = None; // (target_header, distance)
             let mut found_nonspecific = false;
 
-            // Iterate ALL targets (do not break on error, to find best statistic)
+            // Iterate ALL targets
             for (target_header, target_bytes) in target_sequences {
                 
                 // Fast check: find matches within max_allowed_distance
                 let mut best_in_target = usize::MAX;
                 let mut best_end_in_target = 0;
+                let mut best_is_rev = false;
                 
-                // Note: we track the BEST match in this target
-                for (end_pos, dist) in myers.find_all_end(target_bytes, max_allowed_distance) {
+                // Note: we track the BEST match in this target across both strands
+                for (end_pos, dist) in myers_fwd.find_all_end(target_bytes, max_allowed_distance) {
                     if dist < best_in_target {
                         best_in_target = dist;
                         best_end_in_target = end_pos;
+                        best_is_rev = false;
+                    }
+                }
+                for (end_pos, dist) in myers_rev.find_all_end(target_bytes, max_allowed_distance) {
+                    if dist < best_in_target {
+                        best_in_target = dist;
+                        best_end_in_target = end_pos;
+                        best_is_rev = true;
                     }
                 }
                 
@@ -983,7 +1010,14 @@ pub fn check_primer_specificity_candidates(
                     let window_end = (best_end_in_target + buffer).min(target_len);
                     let window_start = best_end_in_target.saturating_sub(region_len + buffer);
                     
-                    let target_window = &target_bytes[window_start..window_end];
+                    let mut target_window = target_bytes[window_start..window_end].to_vec();
+                    
+                    if best_is_rev {
+                        // Reverse complement the off-target window to analyze it in FWD orientation.
+                        // This allows semiglobal alignment and primer mapping against the FWD region_seq.
+                        let rc_str = reverse_complement(&String::from_utf8_lossy(&target_window));
+                        target_window = rc_str.into_bytes();
+                    }
                     
                     // Perform Semiglobal Alignment
                     // Region vs TargetWindow
@@ -998,61 +1032,107 @@ pub fn check_primer_specificity_candidates(
                     // (a reference into the Aligner's internal state) stays valid for both calls.
                     let (l_nonspecific, r_nonspecific) = THREAD_ALIGNER.with(|cell| {
                         let mut aligner = cell.borrow_mut();
-                        let alignment = aligner.semiglobal(region_seq, target_window);
+                        let alignment = aligner.semiglobal(region_seq, &target_window);
 
-                        // Map primer coordinates using alignment path
-                        let check_primer = |p_offset: usize, p_seq: &str| -> bool {
-                            let p_len = p_seq.len();
-                            let p_end_offset = p_offset + p_len;
+                        // Map primer coordinates and compute positional mismatch score
+                        // using the alignment path. Mismatches at the 3' end of the
+                        // primer (last 5 bases) are weighted 3× because they block
+                        // polymerase extension, making the off-target safe.
+                        #[allow(unused_variables, unused_assignments)]
+                        let check_primer = |p_start: usize, p_end: usize, _p_seq: &str| -> bool {
+                            let primer_length = p_end - p_start;
+                            // 3' critical region: last 5 bases of the primer
+                            let three_prime_start = if primer_length > 5 { primer_length - 5 } else { 0 };
+                            let local_threshold = local_mismatch_threshold as f64;
 
-                            let mut t_start_idx = None;
-                            let mut t_end_idx = None;
+                            let mut x = alignment.xstart; // region (query) index
+                            let mut y = alignment.ystart; // window (target) index
+                            let mut in_primer = false;
+                            let mut primer_pos: usize = 0; // position within primer (0 .. primer_length-1)
+                            let mut positional_mismatch_score: f64 = 0.0;
 
-                            let mut x = alignment.xstart; // region index
-                            let mut y = alignment.ystart; // window index
-
-                            // If alignment starts after primer (clipping), we consider it mismatch?
-                            if x > p_offset { return false; }
-
-                            let mut covered = false;
+                            // If alignment starts after the primer region, the entire
+                            // primer is clipped — treat as specific (safe off-target).
+                            if x > p_start { return false; }
 
                             for op in &alignment.operations {
-                                if x == p_offset { t_start_idx = Some(y); }
-                                if x == p_end_offset { t_end_idx = Some(y); covered = true; break; }
+                                // Detect entry into the primer region
+                                if !in_primer && x >= p_start {
+                                    in_primer = true;
+                                    primer_pos = x - p_start;
+                                }
 
-                                match op {
-                                    AlignmentOperation::Match | AlignmentOperation::Subst => {
-                                        x += 1; y += 1;
-                                    },
-                                    AlignmentOperation::Ins => { y += 1; },
-                                    AlignmentOperation::Del => { x += 1; },
-                                    _ => {}
+                                // If we've passed the primer region, stop
+                                if x >= p_end { break; }
+
+                                if in_primer {
+                                    let weight = if primer_pos >= three_prime_start { 3.0 } else { 1.0 };
+
+                                    match op {
+                                        AlignmentOperation::Subst => {
+                                            positional_mismatch_score += weight;
+                                            x += 1; y += 1;
+                                            primer_pos += 1;
+                                        },
+                                        AlignmentOperation::Ins => {
+                                            // Insertion in target (extra base in target,
+                                            // no primer base consumed)
+                                            positional_mismatch_score += weight;
+                                            y += 1;
+                                        },
+                                        AlignmentOperation::Del => {
+                                            // Deletion in target (primer base has no
+                                            // counterpart in target)
+                                            positional_mismatch_score += weight;
+                                            x += 1;
+                                            primer_pos += 1;
+                                        },
+                                        AlignmentOperation::Match => {
+                                            // Perfect match — no penalty
+                                            x += 1; y += 1;
+                                            primer_pos += 1;
+                                        },
+                                        _ => {}
+                                    }
+
+                                    // Short-circuit: score already exceeds threshold
+                                    // → this off-target is safe, primer is specific here
+                                    if positional_mismatch_score >= local_threshold {
+                                        return false;
+                                    }
+                                } else {
+                                    // Outside primer region — just advance coordinates
+                                    match op {
+                                        AlignmentOperation::Match | AlignmentOperation::Subst => {
+                                            x += 1; y += 1;
+                                        },
+                                        AlignmentOperation::Ins => { y += 1; },
+                                        AlignmentOperation::Del => { x += 1; },
+                                        _ => {}
+                                    }
                                 }
                             }
-                            if x == p_end_offset { t_end_idx = Some(y); covered = true; }
 
-                            if let (Some(ts), Some(te)) = (t_start_idx, t_end_idx) {
-                                if te > target_window.len() { return false; }
-                                let t_slice = &target_window[ts..te];
-                                // Calculate mismatch distance
-                                // Use bounded_levenshtein for exact distance check
-                                if let Some(dist) = bounded_levenshtein(p_seq.as_bytes(), t_slice, local_mismatch_threshold as u32 + 1) {
-                                    return dist < local_mismatch_threshold as u32; // Specific if dist >= threshold
-                                    // Return TRUE if NonSpecific (match found)
-                                }
-                            }
-                            false // Default to Specific if mapping fails
+                            // If we finish the loop and score is below threshold,
+                            // this is a dangerously similar off-target (non-specific).
+                            positional_mismatch_score < local_threshold
                         };
 
-                        let l = check_primer(candidate.left_primer_offset, &candidate.left_primer_seq);
-                        let r = check_primer(candidate.right_primer_offset, &candidate.right_primer_seq);
+                        let l_start = candidate.left_primer_offset;
+                        let l_end = l_start + candidate.left_primer_seq.len();
+                        let l = check_primer(l_start, l_end, &candidate.left_primer_seq);
+                        
+                        // Primer3 right primer offset is the HIGHEST 0-based index.
+                        // So the sequence spans [r_offset + 1 - p_len .. r_offset + 1].
+                        let r_end = candidate.right_primer_offset + 1;
+                        let r_start = r_end.saturating_sub(candidate.right_primer_seq.len());
+                        let r = check_primer(r_start, r_end, &right_primer_forward);
                         (l, r)
                     });
 
                     if l_nonspecific && r_nonspecific {
                          found_nonspecific = true;
-                         // We continue loop to improve min_distance statistics,
-                         // but we already know tag is NonSpecific.
+                         break; // Fast exit! Primer pair is dead in this target
                     }
                 }
             }
@@ -1061,11 +1141,11 @@ pub fn check_primer_specificity_candidates(
             let max_similarity = calculate_similarity(min_distance as u32, region_len, region_len); // Approx len
             
             let tag = if max_similarity < similarity_threshold {
-                PrimerSpecificityTag::Unique_LowSim
+                PrimerSpecificityTag::Specific_LowGlobalSim
             } else if found_nonspecific {
-                PrimerSpecificityTag::NonSpecific_HighSim
+                PrimerSpecificityTag::NonSpecific_Amplification
             } else {
-                PrimerSpecificityTag::Specific_In_SimRegion
+                PrimerSpecificityTag::Specific_PositionalMismatches
             };
             
             let most_similar_target = best_target_match.map(|(h, _)| h.to_string()).unwrap_or_default();
@@ -1089,13 +1169,13 @@ pub fn check_primer_specificity_candidates(
     progress_bar.finish_and_clear();
 
     // -- Summary -------------------------------------------------------------
-    let unique          = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Unique_LowSim).count();
-    let specific_in_sim = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Specific_In_SimRegion).count();
-    let nonspecific     = results.iter().filter(|r| r.tag == PrimerSpecificityTag::NonSpecific_HighSim).count();
+    let unique          = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Specific_LowGlobalSim).count();
+    let specific_in_sim = results.iter().filter(|r| r.tag == PrimerSpecificityTag::Specific_PositionalMismatches).count();
+    let nonspecific     = results.iter().filter(|r| r.tag == PrimerSpecificityTag::NonSpecific_Amplification).count();
     println!("      {} Specificity check done:", style("Done.").bold().green());
-    println!("        Unique (low similarity)      {}", style(unique).bold().white());
-    println!("        Specific in similar region   {}", style(specific_in_sim).bold().white());
-    println!("        Non-specific (high sim hit)  {}", style(nonspecific).bold().white());
+    println!("        Specific (low global similarity)  {}", style(unique).bold().white());
+    println!("        Specific (positional mismatches)  {}", style(specific_in_sim).bold().white());
+    println!("        Non-Specific (amplification)      {}", style(nonspecific).bold().white());
     
     results
 }

@@ -108,6 +108,8 @@ diffprimer run \
 | `--kmer-size` | `-k` | K-mer size for uniqueness check (Default: 21). |
 | `--min-region-length` | `-m` | Minimum length of unique regions to keep (Default: 200 bp). |
 | `--check-specificity` | | **Highly Recommended.** Enables the rigorous cryptographic check of primer specificity. Without this, primers are only designed on unique regions but not physically verified against off-targets. |
+| `--similarity-threshold` | | Global similarity threshold (%) for off-target flagging (Default: 80.0). |
+| `--local-mismatch-threshold` | | Positional mismatch score threshold for the local specificity check. Standard mismatches add 1, 3' end mismatches add 3. Default is 7, allowing up to 2 mismatches in the 3' region to still be considered non-specific (capable of amplifying). |
 
 ---
 
@@ -119,9 +121,9 @@ The output is a CSV file containing one row per designed primer pair. Key column
 -   `Region_Start`/`End`: Coordinates of the unique region.
 -   `Forward_Primer` / `Reverse_Primer` (and `_Tm`, `_GC`, etc.): Primer details.
 -   **`Specificity_Tag`**: The result of the specificity analysis (if `--check-specificity` is used).
-    -   `Unique_LowSim`: The region is globally unique; primers are safe.
-    -   `Specific_In_SimRegion`: The region has some similarity to background, but the primers *themselves* are specific (mismatch locally). **Safe to use.**
-    -   `NonSpecific_HighSim`: The primers bind perfectly to a similar region in a background genome. **Do NOT use.**
+    -   `Specific_LowGlobalSim`: The region is globally unique; off-targets are extremely dissimilar, so primers are specific.
+    -   `Specific_PositionalMismatches`: The region has high global similarity to a background genome, BUT the primers *themselves* are specific because they have biological mismatches in critical locations (like the 3' end) that prevent binding.
+    -   `NonSpecific_Amplification`: The primers bind perfectly or near-perfectly to a similar region in a background genome resulting in cross-reactivity. **Do NOT use.**
     -   `Not_Checked`: Specificity check was skipped.
 -   `Gene_Name` / `Product`: Annotation info (if GFF3 provided).
 

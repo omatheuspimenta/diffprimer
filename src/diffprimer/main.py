@@ -69,6 +69,7 @@ def main(
     reference_max_abundance: int = 1,
     check_specificity: bool = False,
     similarity_threshold: float = 80.0,
+    local_mismatch_threshold: int = 7,
 ) -> None:
     """
     Main execution logic for the diffprimer pipeline.
@@ -86,6 +87,7 @@ def main(
         reference_max_abundance (int): Max k-mer abundance in reference to be considered unique.
         check_specificity (bool): Whether to perform specificity checks on designed primers.
         similarity_threshold (float): Threshold (%) for specificity checks.
+        local_mismatch_threshold (int): Weight score threshold allowing mismatches in primer ends.
     """    
     input_table = Table(show_header=False, box=None, padding=(0, 2))
     input_table.add_column("Parameter", style="bold cyan")
@@ -102,6 +104,7 @@ def main(
 
     if check_specificity:
         input_table.add_row("Similarity Threshold", str(similarity_threshold))
+        input_table.add_row("Local Mismatch Thresh", str(local_mismatch_threshold))
 
     console.print(Panel(
         input_table, 
@@ -272,7 +275,7 @@ def main(
                 candidates=candidates,
                 sequences_dir=sequences_path,
                 similarity_threshold=sim_threshold,
-                local_mismatch_threshold=3,
+                local_mismatch_threshold=local_mismatch_threshold,
                 num_threads=cpus
             )
             

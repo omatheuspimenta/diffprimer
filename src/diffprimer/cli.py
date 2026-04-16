@@ -191,6 +191,19 @@ def run(
             rich_help_panel="Configuration",
         ),
     ] = 80.0,
+    local_mismatch_threshold: Annotated[
+        int,
+        Option(
+            "--local-mismatch-threshold",
+            help=(
+                "Local mismatch score threshold for primer binding.\n\n"
+                "Mismatches in the 5' end add 1 to the score, while 3' end mismatches add 3. "
+                "A score below this threshold means the primer is considered to bind (non-specific hit). "
+                "The default is 7, which allows up to 2 mismatches in the 3' region."
+            ),
+            rich_help_panel="Configuration",
+        ),
+    ] = 7,
 ) -> None:
     """
     Run the diffprimer analysis pipeline.
@@ -228,4 +241,5 @@ def run(
         reference_max_abundance=reference_max_abundance,
         check_specificity=check_specificity,
         similarity_threshold=similarity_threshold,
+        local_mismatch_threshold=local_mismatch_threshold,
     )
