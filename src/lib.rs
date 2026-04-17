@@ -422,24 +422,29 @@ pub struct ContigRegions {
     pub header: String,
     #[pyo3(get, set)]
     pub regions: Vec<Region>,
+    /// Full length of the original contig sequence (for visualization).
+    #[pyo3(get, set)]
+    pub sequence_length: usize,
 }
 
 #[pymethods]
 impl ContigRegions {
     /// Creates a new ContigRegions object.
     #[new]
-    fn new(header: String, regions: Vec<Region>) -> Self {
+    fn new(header: String, regions: Vec<Region>, sequence_length: usize) -> Self {
         ContigRegions {
             header,
             regions,
+            sequence_length,
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ContigRegions(header='{}', num_regions={})",
+            "ContigRegions(header='{}', num_regions={}, seq_len={})",
             self.header,
-            self.regions.len()
+            self.regions.len(),
+            self.sequence_length
         )
     }
 }
@@ -649,9 +654,11 @@ pub fn process_reference_contigs(
         }
 
         // Store lightweight ContigRegions (no full sequence)
+        let seq_len = sequence.len();
         all_contig_regions.push(ContigRegions {
             header,
             regions,
+            sequence_length: seq_len,
         });
 
         // `sequence` is dropped here — memory freed immediately

@@ -2,6 +2,7 @@ from diffprimer.kmer_extractor import process_seqs, PrimerCandidate
 from diffprimer.config import load_config
 from diffprimer.helpers import write_csv, get_primers, write_csv_header, annotation_dataframe, get_sequence_intersection
 from diffprimer.logs import diffprimerLog, _make_progress
+from diffprimer.report import generate_html_report
 import os
 import multiprocessing
 from functools import partial
@@ -53,6 +54,7 @@ def design_primers_for_contig(contig_data, global_args):
                     "header": region_header,
                     "sequence": region_seq,
                 })
+                n_region += 1
             except Exception as e:
                 logger.error(f"Error processing region in {header}: {e}")
                 
@@ -193,11 +195,18 @@ def main(
     # Prepare data for multiprocessing
     # Extract simple data structures to avoid pickling issues with PyO3 objects if any
     contig_data_list = []
+    contig_info_for_report = []  # lightweight info for the HTML genome viz
     for contig in result:
         # Convert Rust Region objects to pure Python types (dicts)
         # Each region now carries its own subsequence — no need for the full contig sequence
         regions_data = [{"start": r.start, "end": r.end, "subsequence": r.subsequence} for r in contig.regions]
         contig_data_list.append((contig.header, regions_data))
+        # Collect contig-level info for the report genome visualization
+        contig_info_for_report.append({
+            "header": contig.header,
+            "length": contig.sequence_length,
+            "regions": [{"start": r.start, "end": r.end} for r in contig.regions],
+        })
 
     logger.info(
         f"Designing primers for [bold white]{len(contig_data_list)}[/bold white] contig(s) "
@@ -332,4 +341,28 @@ def main(
 
     logger.info(
         f"[bold green]Done.[/bold green] Results saved to [bold white]{output_file}[/bold white]"
+    )
+
+    # ── Generate HTML Report ──────────────────────────────────────────
+    run_params = {
+        "Reference File": str(reference_file),
+        "Sequences Path": str(sequences_path),
+        "Annotation File": str(annotation_path) if annotation_path else "Not provided",
+        "Configuration File": str(config_file) if config_file else "Default",
+        "K-mer Size": str(k),
+        "Min Region Length": str(min_region_length),
+        "Ref Max Abundance": str(reference_max_abundance),
+        "CPUs Used": str(cpus),
+        "Check Specificity": str(check_specificity),
+    }
+    if check_specificity:
+        run_params["Similarity Threshold"] = str(similarity_threshold)
+        run_params["Local Mismatch Threshold"] = str(local_mismatch_threshold)
+
+    generate_html_report(
+        results_dir=results_dir,
+        run_params=run_params,
+        primer3_args=global_args,
+        contig_info=contig_info_for_report,
+        version=None,  # uses __version__ from the package
     )
