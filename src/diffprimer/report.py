@@ -238,7 +238,7 @@ def generate_html_report(
     display_columns = [
         "Sequence_ID", "Region_ID", "Start", "End",
         "Forw_Seq", "Rev_Seq", "Left_Size", "Right_Size",
-        "Amplicon_Seq", "Amplicon_Size", "Region_Length",
+        "Amplicon_Seq", "Amplicon_Size", "Sequence_Region", "Region_Length",
         "Annotation", "Specificity_Tag", "Most_Similar_Target", "Max_Similarity_pct",
     ]
     display_labels = {
@@ -252,6 +252,7 @@ def generate_html_report(
         "Right_Size": "Rev Size",
         "Amplicon_Seq": "Amplicon Seq",
         "Amplicon_Size": "Amplicon Size",
+        "Sequence_Region": "Sequence Region",
         "Region_Length": "Region Length",
         "Annotation": "Annotation",
         "Specificity_Tag": "Specificity",
@@ -310,7 +311,7 @@ def generate_html_report(
 
             if col == "Specificity_Tag":
                 cells += f"<td>{tag_html}</td>"
-            elif col in ("Forw_Seq", "Rev_Seq", "Amplicon_Seq", "Annotation", "Most_Similar_Target"):
+            elif col in ("Forw_Seq", "Rev_Seq", "Amplicon_Seq", "Sequence_Region", "Annotation", "Most_Similar_Target"):
                 cells += f"<td>{_copy_cell(val, val, truncate=True)}</td>"
             else:
                 cells += f"<td>{_copy_cell(val, val)}</td>"
