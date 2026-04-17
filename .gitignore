@@ -60,3 +60,8 @@ diffprimer_results.csv
 
 # Documentation
 site/
+
+# Mocks
+mocks/
+make_mock.py
+mock_results/

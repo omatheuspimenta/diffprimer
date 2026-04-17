@@ -28,7 +28,7 @@ mock_data = {
     ],
     "Sequence_Region": ["NNNACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTANNN", "NNNTGCATGCATGCANNNNNNNNNNNNNNCATGCATGCATGNNN", "NNNATGCATGCATGCNNNNNNNNNNNNNNGCATGCATGCATNNN", "NNNGCATGCATGCATNNNNNNNNNNNNNTGCATGCATGCANNN"],
     "Specificity_Tag": [
-        "Specific_HighSim",
+        "Specific_LowGlobalSim",
         "Specific_LowGlobalSim",
         "Specific_PositionalMismatches",
         "NonSpecific_Amplification"

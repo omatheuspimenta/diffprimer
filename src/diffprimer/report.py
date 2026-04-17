@@ -851,6 +851,7 @@ table.dataTable tbody tr:hover {{
 /* ── Utility ───────────────────────────────────────────────────────── */
 .mb-2 {{ margin-bottom: 2rem; }}
 .mt-1 {{ margin-top: 1rem; }}
+
     </style>
 </head>
 <body>
@@ -917,7 +918,7 @@ table.dataTable tbody tr:hover {{
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Amplicon Size Distribution</h2>
-                    <p>Distribution of predicted PCR amplicon lengths (bp). Narrower distributions indicate more uniform amplification conditions.</p>
+                    <p>Distribution of predicted PCR amplicon lengths (bp).</p>
                 </div>
                 <div class="chart-body"><div id="plot-amplicon"></div></div>
             </div>
@@ -926,10 +927,9 @@ table.dataTable tbody tr:hover {{
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Specificity Breakdown</h2>
-                    <p>Proportion of primers classified by specificity analysis.
-                    <br/><strong style="font-size:0.75rem;">Specific_HighSim</strong>: Unique seq, no homology.
-                    <strong style="font-size:0.75rem;">Specific_LowGlobalSim</strong>: No off-target hit above sim threshold.
-                    <strong style="font-size:0.75rem;">Specific_PositionalMismatches</strong>: Similarity found, but 3' mismatches prevent amplification.
+                    <p>Proportion of primers classified by specificity analysis.<br/><br/>
+                    <strong style="font-size:0.75rem;">Specific_LowGlobalSim</strong>: No off-target hit above similarity threshold.<br/>
+                    <strong style="font-size:0.75rem;">Specific_PositionalMismatches</strong>: Similarity found, but 3' mismatches prevent amplification.<br/>
                     <strong style="font-size:0.75rem;">NonSpecific_Amplification</strong>: Will amplify an off-target sequence.</p>
                 </div>
                 <div class="chart-body"><div id="plot-specificity"></div></div>
@@ -975,6 +975,12 @@ table.dataTable tbody tr:hover {{
                 <span class="chevron">▾</span>
             </button>
             <div class="params-body open" id="genomeVizBody" style="padding: 1rem 1.5rem;">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+                    <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="toggleAnnotations" checked onchange="updateGenomeAnnotations(this.checked)" />
+                        Show Genome Annotations
+                    </label>
+                </div>
                 <div id="genome-viz-container"></div>
             </div>
         </div>
@@ -1184,15 +1190,45 @@ Plotly.newPlot('plot-specificity', [{{
     marker: {{ colors: COLORS, line: {{ color: '#fff', width: 2 }} }},
     textinfo: 'percent',
     textposition: 'outside',
-    textfont: {{ size: 14 }},
+    textfont: {{ size: 18 }},
     hoverinfo: 'label+value+percent',
     pull: 0.02
 }}], {{
     ...layoutBase,
     showlegend: true,
-    legend: {{ orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: {{ size: 10 }} }},
+    legend: {{ orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: {{ size: 12 }}, itemsizing: 'constant', itemwidth: 50}},
     margin: {{ t: 20, r: 40, l: 40, b: 60 }}
-}}, plotConfig);
+}}, plotConfig).then(function() {{
+    setTimeout(function() {{
+        var svg = document.querySelector('#plot-specificity svg');
+        if (!svg) return;
+
+        document.querySelectorAll('#plot-specificity .legendpie')
+            .forEach(function(el) {{
+                var fill = el.style.fill || el.getAttribute('fill') || 'gray';
+
+                // Pega posição real na tela
+                var rect = el.getBoundingClientRect();
+                var svgRect = svg.getBoundingClientRect();
+
+                // Converte para coordenadas do SVG
+                var pt = svg.createSVGPoint();
+                pt.x = rect.left + rect.width / 2;
+                pt.y = rect.top + rect.height / 2;
+                var svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+                // Cria círculo no SVG raiz (fora do clipPath)
+                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', svgP.x);
+                circle.setAttribute('cy', svgP.y);
+                circle.setAttribute('r', '8');
+                circle.setAttribute('fill', fill);
+
+                svg.appendChild(circle);
+                el.style.display = 'none';
+            }});
+    }}, 400);
+}});
 
 // ── Plot 3: Off-Target Homology ──────────────────────────────────────
 Plotly.newPlot('plot-homology', [{{
@@ -1291,6 +1327,22 @@ Plotly.newPlot('plot-tmgc', [
 }}, plotConfig);
 
 // ── Genome Browser Visualization ─────────────────────────────────────
+window.genomePlots = [];
+window.updateGenomeAnnotations = function(show) {{
+    window.genomePlots.forEach(plotId => {{
+        const el = document.getElementById(plotId);
+        if (el && el.layout && el.layout.annotations) {{
+            const newAnns = el.layout.annotations.map(a => {{
+                if (a.name === 'gene_annotation') {{
+                    a.visible = show;
+                }}
+                return a;
+            }});
+            Plotly.relayout(plotId, {{ annotations: newAnns }});
+        }}
+    }});
+}};
+
 (function() {{
     const contigData = {contig_json};
     const container = document.getElementById('genome-viz-container');
@@ -1300,16 +1352,9 @@ Plotly.newPlot('plot-tmgc', [
         return;
     }}
 
-    // Filter to only contigs with regions that have primers
-    const contigsWithRegions = contigData.map(c => {{
-        return {{...c, regions: (c.regions || []).filter(r => r.primer_left_start !== undefined)}};
-    }}).filter(c => c.regions && c.regions.length > 0);
+    // Do not filter out any contigs to show full information for all contigs
+    const contigsWithRegions = contigData;
     
-    if (contigsWithRegions.length === 0) {{
-        container.innerHTML = '<div class="chart-card" style="padding:2rem;text-align:center;color:var(--text-muted);">No primers designed for any exclusive regions.</div>';
-        return;
-    }}
-
     // Build one chart card per contig
     contigsWithRegions.forEach((contig, cIdx) => {{
         const card = document.createElement('div');
@@ -1320,19 +1365,20 @@ Plotly.newPlot('plot-tmgc', [
         const regions = contig.regions || [];
         const nRegions = regions.length;
 
-        // We display all regions
-        const showAll = true;
         const displayRegions = regions;
 
         const headerHtml = `
             <div class="chart-header">
                 <h2>${{contig.header}}</h2>
-                <p>${{nRegions}} region(s) with primers &bull; Contig length: ${{contigLen.toLocaleString()}} bp</p>
+                <p>${{nRegions}} target region(s) &bull; Contig length: ${{contigLen.toLocaleString()}} bp</p>
             </div>
         `;
 
         const plotId = `genome-plot-${{cIdx}}`;
-        const heightPx = Math.max(120, displayRegions.length * 35 + 70);
+        window.genomePlots.push(plotId);
+        
+        // Fixed vertical formatting for consistency
+        const heightPx = 160;
         card.innerHTML = headerHtml + `<div class="chart-body"><div id="${{plotId}}" style="height:${{heightPx}}px;"></div></div>`;
         container.appendChild(card);
 
@@ -1340,8 +1386,8 @@ Plotly.newPlot('plot-tmgc', [
         const shapes = [];
         const annotations = [];
         const yBase = 0;
-        const barH = 0.35;
-        const yRange = heightPx / 120; // keeps the bar exactly proportional to height in pixels!
+        const barH = 0.4;
+        const yRange = 2.0;
 
         // Contig backbone
         shapes.push({{
@@ -1356,84 +1402,89 @@ Plotly.newPlot('plot-tmgc', [
         // Annotations for contig ends
         annotations.push({{
             x: 0, y: yBase, text: '0', showarrow: false,
-            font: {{ size: 9, color: '#94a3b8' }}, yshift: -20, xanchor: 'left'
+            font: {{ size: 9, color: '#94a3b8' }}, yshift: -25, xanchor: 'left'
         }});
         annotations.push({{
             x: contigLen, y: yBase, text: contigLen.toLocaleString() + ' bp', showarrow: false,
-            font: {{ size: 9, color: '#94a3b8' }}, yshift: -20, xanchor: 'right'
+            font: {{ size: 9, color: '#94a3b8' }}, yshift: -25, xanchor: 'right'
         }});
 
-        // Each region as a colored block on the contig
-        const regionColors = [
-            'rgba(37,99,235,0.25)', 'rgba(5,150,105,0.25)', 'rgba(124,58,237,0.25)',
-            'rgba(217,119,6,0.25)', 'rgba(13,148,136,0.25)', 'rgba(220,38,38,0.25)',
-        ];
-        const regionBorders = [
-            '{PALETTE["primary"]}', '{PALETTE["success"]}', '{PALETTE["purple"]}',
-            '{PALETTE["warning"]}', '{PALETTE["teal"]}', '{PALETTE["danger"]}',
+        // Use consistent colors for all regions
+        const regionColor = 'rgba(37,99,235,0.25)';
+        const regionBorder = '{PALETTE["primary"]}';
+
+        const primerTraces = [
+            {{ x: [], y: [], hoverinfo: 'skip', type: 'scatter', mode: 'markers', marker: {{ symbol: 'triangle-right', size: 10, color: '{PALETTE["success"]}', line: {{ color: 'white', width: 1 }} }}, showlegend: false }},
+            {{ x: [], y: [], hoverinfo: 'skip', type: 'scatter', mode: 'markers', marker: {{ symbol: 'triangle-left', size: 10, color: '{PALETTE["danger"]}', line: {{ color: 'white', width: 1 }} }}, showlegend: false }}
         ];
 
         displayRegions.forEach((region, rIdx) => {{
+            if (region.start === undefined || region.end === undefined) return;
             const rStart = region.start;
             const rEnd = region.end;
-            const colorIdx = rIdx % regionColors.length;
 
             // Region rectangle on the contig bar
             shapes.push({{
                 type: 'rect',
                 x0: rStart, x1: rEnd,
                 y0: yBase - barH, y1: yBase + barH,
-                fillcolor: regionColors[colorIdx],
-                line: {{ color: regionBorders[colorIdx], width: 1.5 }},
+                fillcolor: regionColor,
+                line: {{ color: regionBorder, width: 1.5 }},
                 layer: 'above'
             }});
 
-            // Region label
+            // Region label (R1, R2, ...) placed below the bar
             const midpoint = (rStart + rEnd) / 2;
             const regionLen = rEnd - rStart;
-            let tooltipText = `R${{rIdx + 1}} (${{regionLen.toLocaleString()}} bp)`;
+            let tooltipText = `Region ${{rIdx + 1}} (${{regionLen.toLocaleString()}} bp)`;
+            
+            let hasAnnotation = false;
+            let geneId = "";
             if (region.annotation && region.annotation !== "no annotation" && region.annotation !== "-" && region.annotation !== "no annotation (file not loaded)") {{
-                tooltipText += `<br>Gene ID: ${{region.annotation}}`;
+                geneId = region.annotation;
+                tooltipText += `<br>Gene ID: ${{geneId}}`;
+                hasAnnotation = true;
             }}
             
             annotations.push({{
                 x: midpoint,
-                y: yBase,
+                y: yBase - barH - 0.2,
                 text: `R${{rIdx + 1}}`,
                 hovertext: tooltipText,
                 showarrow: false,
-                font: {{ size: 8, color: regionBorders[colorIdx], family: 'Inter' }},
+                font: {{ size: 9, color: regionBorder, family: 'Inter', weight: 'bold' }},
                 yshift: 0
             }});
 
-            // Small marker for amplicon within region (if we have primer data)
-            // We use a thin colored line below the region bar to indicate primer positions
+            if (hasAnnotation) {{
+                annotations.push({{
+                    name: 'gene_annotation',
+                    x: midpoint,
+                    y: yBase + barH + 0.3,
+                    text: geneId,
+                    showarrow: false,
+                    font: {{ size: 9, color: '{PALETTE["text_muted"]}' }},
+                    visible: document.getElementById('toggleAnnotations') ? document.getElementById('toggleAnnotations').checked : true
+                }});
+            }}
+
+            // Scatter markers for primers (if defined)
             if (region.primer_left_start !== undefined) {{
-                // Primer left arrow
-                shapes.push({{
-                    type: 'line',
-                    x0: rStart + (region.primer_left_start || 0),
-                    x1: rStart + (region.primer_left_start || 0) + (region.primer_left_len || 20),
-                    y0: yBase - barH - 0.12,
-                    y1: yBase - barH - 0.12,
-                    line: {{ color: '{PALETTE["success"]}', width: 3 }}
-                }});
-                // Primer right arrow
-                shapes.push({{
-                    type: 'line',
-                    x0: rStart + (region.primer_right_start || regionLen - 20),
-                    x1: rStart + (region.primer_right_start || regionLen - 20) + (region.primer_right_len || 20),
-                    y0: yBase - barH - 0.12,
-                    y1: yBase - barH - 0.12,
-                    line: {{ color: '{PALETTE["danger"]}', width: 3 }}
-                }});
+                primerTraces[0].x.push(rStart + region.primer_left_start);
+                primerTraces[0].y.push(yBase);
+                
+                const rightX = rStart + (region.primer_right_start || regionLen - 20) + (region.primer_right_len || 20);
+                primerTraces[1].x.push(rightX);
+                primerTraces[1].y.push(yBase);
             }}
         }});
 
-        // Build layout
-        Plotly.newPlot(plotId, [{{
-            x: [null], y: [null], type: 'scatter', mode: 'none', showlegend: false
-        }}], {{
+        // Built layout data
+        Plotly.newPlot(plotId, [
+            {{ x: [null], y: [null], type: 'scatter', mode: 'none', showlegend: false }},
+            primerTraces[0],
+            primerTraces[1]
+        ], {{
             ...layoutBase,
             xaxis: {{
                 title: 'Position (bp)',
@@ -1461,9 +1512,9 @@ Plotly.newPlot('plot-tmgc', [
     legendCard.innerHTML = `
         <div style="padding:1rem 1.5rem; display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center; font-size:0.8rem; color:var(--text-muted);">
             <span><span style="display:inline-block;width:14px;height:14px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Contig backbone</span>
-            <span><span style="display:inline-block;width:14px;height:14px;background:rgba(37,99,235,0.25);border:1px solid {PALETTE["primary"]};border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Exclusive region</span>
-            <span><span style="display:inline-block;width:14px;height:4px;background:{PALETTE["success"]};border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Forward primer</span>
-            <span><span style="display:inline-block;width:14px;height:4px;background:{PALETTE["danger"]};border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Reverse primer</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:rgba(37,99,235,0.25);border:1px solid {PALETTE["primary"]};border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Target Region (R1, R2...)</span>
+            <span><span style="display:inline-block;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid {PALETTE["success"]};vertical-align:middle;margin-right:4px;"></span> Forward primer</span>
+            <span><span style="display:inline-block;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid {PALETTE["danger"]};vertical-align:middle;margin-right:4px;"></span> Reverse primer</span>
         </div>
     `;
     container.appendChild(legendCard);

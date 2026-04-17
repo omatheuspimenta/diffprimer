@@ -514,6 +514,7 @@ table.dataTable tbody tr:hover {
 /* ── Utility ───────────────────────────────────────────────────────── */
 .mb-2 { margin-bottom: 2rem; }
 .mt-1 { margin-top: 1rem; }
+
     </style>
 </head>
 <body>
@@ -580,7 +581,7 @@ table.dataTable tbody tr:hover {
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Amplicon Size Distribution</h2>
-                    <p>Distribution of predicted PCR amplicon lengths (bp). Narrower distributions indicate more uniform amplification conditions.</p>
+                    <p>Distribution of predicted PCR amplicon lengths (bp).</p>
                 </div>
                 <div class="chart-body"><div id="plot-amplicon"></div></div>
             </div>
@@ -589,10 +590,9 @@ table.dataTable tbody tr:hover {
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Specificity Breakdown</h2>
-                    <p>Proportion of primers classified by specificity analysis.
-                    <br/><strong style="font-size:0.75rem;">Specific_HighSim</strong>: Unique seq, no homology.
-                    <strong style="font-size:0.75rem;">Specific_LowGlobalSim</strong>: No off-target hit above sim threshold.
-                    <strong style="font-size:0.75rem;">Specific_PositionalMismatches</strong>: Similarity found, but 3' mismatches prevent amplification.
+                    <p>Proportion of primers classified by specificity analysis.<br/><br/>
+                    <strong style="font-size:0.75rem;">Specific_LowGlobalSim</strong>: No off-target hit above similarity threshold.<br/>
+                    <strong style="font-size:0.75rem;">Specific_PositionalMismatches</strong>: Similarity found, but 3' mismatches prevent amplification.<br/>
                     <strong style="font-size:0.75rem;">NonSpecific_Amplification</strong>: Will amplify an off-target sequence.</p>
                 </div>
                 <div class="chart-body"><div id="plot-specificity"></div></div>
@@ -638,6 +638,12 @@ table.dataTable tbody tr:hover {
                 <span class="chevron">▾</span>
             </button>
             <div class="params-body open" id="genomeVizBody" style="padding: 1rem 1.5rem;">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+                    <label style="font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="toggleAnnotations" checked onchange="updateGenomeAnnotations(this.checked)" />
+                        Show Genome Annotations
+                    </label>
+                </div>
                 <div id="genome-viz-container"></div>
             </div>
         </div>
@@ -667,7 +673,7 @@ table.dataTable tbody tr:hover {
 
                 </tr></thead>
                 <tbody>
-                    <tr><td><div class="flex-copy-cell"><span class="copy-text">Sequence_A</span> <button class="copy-btn" onclick="copyText(this, 'Sequence_A')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">region_1</span> <button class="copy-btn" onclick="copyText(this, 'region_1')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">100</span> <button class="copy-btn" onclick="copyText(this, '100')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">500</span> <button class="copy-btn" onclick="copyText(this, '500')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ACGTACGTACGT">ACGTACGTACGT</span> <button class="copy-btn" onclick="copyText(this, 'ACGTACGTACGT')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="TACGTACGTACG">TACGTACGTACG</span> <button class="copy-btn" onclick="copyText(this, 'TACGTACGTACG')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA">ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA</span> <button class="copy-btn" onclick="copyText(this, 'ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">37</span> <button class="copy-btn" onclick="copyText(this, '37')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">400</span> <button class="copy-btn" onclick="copyText(this, '400')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="gene001">gene001</span> <button class="copy-btn" onclick="copyText(this, 'gene001')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><span class="badge specific">Specific_HighSim</span></td><td><div class="flex-copy-cell"><span class="seq-cell" title="-">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td></tr>
+                    <tr><td><div class="flex-copy-cell"><span class="copy-text">Sequence_A</span> <button class="copy-btn" onclick="copyText(this, 'Sequence_A')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">region_1</span> <button class="copy-btn" onclick="copyText(this, 'region_1')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">100</span> <button class="copy-btn" onclick="copyText(this, '100')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">500</span> <button class="copy-btn" onclick="copyText(this, '500')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ACGTACGTACGT">ACGTACGTACGT</span> <button class="copy-btn" onclick="copyText(this, 'ACGTACGTACGT')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="TACGTACGTACG">TACGTACGTACG</span> <button class="copy-btn" onclick="copyText(this, 'TACGTACGTACG')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA">ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA</span> <button class="copy-btn" onclick="copyText(this, 'ACGTACGTACGTNNNNNNNNNNNNNCGTACGTACGTA')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">37</span> <button class="copy-btn" onclick="copyText(this, '37')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">400</span> <button class="copy-btn" onclick="copyText(this, '400')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="gene001">gene001</span> <button class="copy-btn" onclick="copyText(this, 'gene001')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><span class="badge specific">Specific_LowGlobalSim</span></td><td><div class="flex-copy-cell"><span class="seq-cell" title="-">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td></tr>
 <tr><td><div class="flex-copy-cell"><span class="copy-text">Sequence_A</span> <button class="copy-btn" onclick="copyText(this, 'Sequence_A')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">region_2</span> <button class="copy-btn" onclick="copyText(this, 'region_2')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">1000</span> <button class="copy-btn" onclick="copyText(this, '1000')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">1500</span> <button class="copy-btn" onclick="copyText(this, '1500')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="TGCATGCATGCA">TGCATGCATGCA</span> <button class="copy-btn" onclick="copyText(this, 'TGCATGCATGCA')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="CATGCATGCATG">CATGCATGCATG</span> <button class="copy-btn" onclick="copyText(this, 'CATGCATGCATG')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="TGCATGCATGCANNNNNNNNNNNNNNCATGCATGCATG">TGCATGCATGCANNNNNNNNNNNNNNCATGCATGCATG</span> <button class="copy-btn" onclick="copyText(this, 'TGCATGCATGCANNNNNNNNNNNNNNCATGCATGCATG')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">38</span> <button class="copy-btn" onclick="copyText(this, '38')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">500</span> <button class="copy-btn" onclick="copyText(this, '500')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="gene002">gene002</span> <button class="copy-btn" onclick="copyText(this, 'gene002')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><span class="badge specific">Specific_LowGlobalSim</span></td><td><div class="flex-copy-cell"><span class="seq-cell" title="-">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">-</span> <button class="copy-btn" onclick="copyText(this, '-')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td></tr>
 <tr><td><div class="flex-copy-cell"><span class="copy-text">Sequence_B</span> <button class="copy-btn" onclick="copyText(this, 'Sequence_B')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">region_1</span> <button class="copy-btn" onclick="copyText(this, 'region_1')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">200</span> <button class="copy-btn" onclick="copyText(this, '200')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">600</span> <button class="copy-btn" onclick="copyText(this, '600')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ATGCATGCATGC">ATGCATGCATGC</span> <button class="copy-btn" onclick="copyText(this, 'ATGCATGCATGC')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ATGCATGCATGC">ATGCATGCATGC</span> <button class="copy-btn" onclick="copyText(this, 'ATGCATGCATGC')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="ATGCATGCATGCNNNNNNNNNNNNNNGCATGCATGCAT">ATGCATGCATGCNNNNNNNNNNNNNNGCATGCATGCAT</span> <button class="copy-btn" onclick="copyText(this, 'ATGCATGCATGCNNNNNNNNNNNNNNGCATGCATGCAT')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">38</span> <button class="copy-btn" onclick="copyText(this, '38')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">400</span> <button class="copy-btn" onclick="copyText(this, '400')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="no annotation">no annotation</span> <button class="copy-btn" onclick="copyText(this, 'no annotation')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><span class="badge specific">Specific_PositionalMismatches</span></td><td><div class="flex-copy-cell"><span class="seq-cell" title="OffTarget_Seq_B">OffTarget_Seq_B</span> <button class="copy-btn" onclick="copyText(this, 'OffTarget_Seq_B')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">78.5</span> <button class="copy-btn" onclick="copyText(this, '78.5')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td></tr>
 <tr><td><div class="flex-copy-cell"><span class="copy-text">Sequence_C</span> <button class="copy-btn" onclick="copyText(this, 'Sequence_C')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">region_1</span> <button class="copy-btn" onclick="copyText(this, 'region_1')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">50</span> <button class="copy-btn" onclick="copyText(this, '50')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">400</span> <button class="copy-btn" onclick="copyText(this, '400')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="GCATGCATGCAT">GCATGCATGCAT</span> <button class="copy-btn" onclick="copyText(this, 'GCATGCATGCAT')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="TGCATGCATGCA">TGCATGCATGCA</span> <button class="copy-btn" onclick="copyText(this, 'TGCATGCATGCA')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">12</span> <button class="copy-btn" onclick="copyText(this, '12')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="GCATGCATGCATNNNNNNNNNNNNNTGCATGCATGCA">GCATGCATGCATNNNNNNNNNNNNNTGCATGCATGCA</span> <button class="copy-btn" onclick="copyText(this, 'GCATGCATGCATNNNNNNNNNNNNNTGCATGCATGCA')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">37</span> <button class="copy-btn" onclick="copyText(this, '37')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">350</span> <button class="copy-btn" onclick="copyText(this, '350')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="seq-cell" title="hypothetical_003">hypothetical_003</span> <button class="copy-btn" onclick="copyText(this, 'hypothetical_003')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><span class="badge nonspecific">NonSpecific_Amplification</span></td><td><div class="flex-copy-cell"><span class="seq-cell" title="OffTarget_Seq_C">OffTarget_Seq_C</span> <button class="copy-btn" onclick="copyText(this, 'OffTarget_Seq_C')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td><td><div class="flex-copy-cell"><span class="copy-text">99.0</span> <button class="copy-btn" onclick="copyText(this, '99.0')" title="Copy"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg></button></div></td></tr>
@@ -859,22 +865,52 @@ Plotly.newPlot('plot-amplicon', [
 
 // ── Plot 2: Specificity Donut ────────────────────────────────────────
 Plotly.newPlot('plot-specificity', [{
-    labels: ["Specific_HighSim", "Specific_LowGlobalSim", "Specific_PositionalMismatches", "NonSpecific_Amplification"],
-    values: [1, 1, 1, 1],
+    labels: ["Specific_LowGlobalSim", "Specific_PositionalMismatches", "NonSpecific_Amplification"],
+    values: [2, 1, 1],
     type: 'pie',
     hole: 0.55,
     marker: { colors: COLORS, line: { color: '#fff', width: 2 } },
     textinfo: 'percent',
     textposition: 'outside',
-    textfont: { size: 14 },
+    textfont: { size: 18 },
     hoverinfo: 'label+value+percent',
     pull: 0.02
 }], {
     ...layoutBase,
     showlegend: true,
-    legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 10 } },
+    legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 12 }, itemsizing: 'constant', itemwidth: 50},
     margin: { t: 20, r: 40, l: 40, b: 60 }
-}, plotConfig);
+}, plotConfig).then(function() {
+    setTimeout(function() {
+        var svg = document.querySelector('#plot-specificity svg');
+        if (!svg) return;
+
+        document.querySelectorAll('#plot-specificity .legendpie')
+            .forEach(function(el) {
+                var fill = el.style.fill || el.getAttribute('fill') || 'gray';
+
+                // Pega posição real na tela
+                var rect = el.getBoundingClientRect();
+                var svgRect = svg.getBoundingClientRect();
+
+                // Converte para coordenadas do SVG
+                var pt = svg.createSVGPoint();
+                pt.x = rect.left + rect.width / 2;
+                pt.y = rect.top + rect.height / 2;
+                var svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+                // Cria círculo no SVG raiz (fora do clipPath)
+                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', svgP.x);
+                circle.setAttribute('cy', svgP.y);
+                circle.setAttribute('r', '8');
+                circle.setAttribute('fill', fill);
+
+                svg.appendChild(circle);
+                el.style.display = 'none';
+            });
+    }, 400);
+});
 
 // ── Plot 3: Off-Target Homology ──────────────────────────────────────
 Plotly.newPlot('plot-homology', [{
@@ -973,6 +1009,22 @@ Plotly.newPlot('plot-tmgc', [
 }, plotConfig);
 
 // ── Genome Browser Visualization ─────────────────────────────────────
+window.genomePlots = [];
+window.updateGenomeAnnotations = function(show) {
+    window.genomePlots.forEach(plotId => {
+        const el = document.getElementById(plotId);
+        if (el && el.layout && el.layout.annotations) {
+            const newAnns = el.layout.annotations.map(a => {
+                if (a.name === 'gene_annotation') {
+                    a.visible = show;
+                }
+                return a;
+            });
+            Plotly.relayout(plotId, { annotations: newAnns });
+        }
+    });
+};
+
 (function() {
     const contigData = [{"header": "Sequence_A", "length": 5000, "regions": [{"start": 100, "end": 500, "annotation": "gene001", "primer_left_start": 3, "primer_left_len": 12, "primer_right_len": 12, "primer_right_start": 28}, {"start": 1000, "end": 1500, "annotation": "gene002", "primer_left_start": 3, "primer_left_len": 12, "primer_right_len": 12, "primer_right_start": 29}]}, {"header": "Sequence_B", "length": 8000, "regions": [{"start": 200, "end": 600, "annotation": "no annotation", "primer_left_start": 3, "primer_left_len": 12, "primer_right_len": 12, "primer_right_start": 29}]}, {"header": "Sequence_C", "length": 4000, "regions": [{"start": 50, "end": 400, "annotation": "hypothetical_003", "primer_left_start": 3, "primer_left_len": 12, "primer_right_len": 12, "primer_right_start": 28}]}, {"header": "Sequence_D_NoPrimers", "length": 3000, "regions": [{"start": 10, "end": 200}]}];
     const container = document.getElementById('genome-viz-container');
@@ -982,16 +1034,9 @@ Plotly.newPlot('plot-tmgc', [
         return;
     }
 
-    // Filter to only contigs with regions that have primers
-    const contigsWithRegions = contigData.map(c => {
-        return {...c, regions: (c.regions || []).filter(r => r.primer_left_start !== undefined)};
-    }).filter(c => c.regions && c.regions.length > 0);
+    // Do not filter out any contigs to show full information for all contigs
+    const contigsWithRegions = contigData;
     
-    if (contigsWithRegions.length === 0) {
-        container.innerHTML = '<div class="chart-card" style="padding:2rem;text-align:center;color:var(--text-muted);">No primers designed for any exclusive regions.</div>';
-        return;
-    }
-
     // Build one chart card per contig
     contigsWithRegions.forEach((contig, cIdx) => {
         const card = document.createElement('div');
@@ -1002,19 +1047,20 @@ Plotly.newPlot('plot-tmgc', [
         const regions = contig.regions || [];
         const nRegions = regions.length;
 
-        // We display all regions
-        const showAll = true;
         const displayRegions = regions;
 
         const headerHtml = `
             <div class="chart-header">
                 <h2>${contig.header}</h2>
-                <p>${nRegions} region(s) with primers &bull; Contig length: ${contigLen.toLocaleString()} bp</p>
+                <p>${nRegions} target region(s) &bull; Contig length: ${contigLen.toLocaleString()} bp</p>
             </div>
         `;
 
         const plotId = `genome-plot-${cIdx}`;
-        const heightPx = Math.max(120, displayRegions.length * 35 + 70);
+        window.genomePlots.push(plotId);
+        
+        // Fixed vertical formatting for consistency
+        const heightPx = 160;
         card.innerHTML = headerHtml + `<div class="chart-body"><div id="${plotId}" style="height:${heightPx}px;"></div></div>`;
         container.appendChild(card);
 
@@ -1022,8 +1068,8 @@ Plotly.newPlot('plot-tmgc', [
         const shapes = [];
         const annotations = [];
         const yBase = 0;
-        const barH = 0.35;
-        const yRange = heightPx / 120; // keeps the bar exactly proportional to height in pixels!
+        const barH = 0.4;
+        const yRange = 2.0;
 
         // Contig backbone
         shapes.push({
@@ -1038,84 +1084,89 @@ Plotly.newPlot('plot-tmgc', [
         // Annotations for contig ends
         annotations.push({
             x: 0, y: yBase, text: '0', showarrow: false,
-            font: { size: 9, color: '#94a3b8' }, yshift: -20, xanchor: 'left'
+            font: { size: 9, color: '#94a3b8' }, yshift: -25, xanchor: 'left'
         });
         annotations.push({
             x: contigLen, y: yBase, text: contigLen.toLocaleString() + ' bp', showarrow: false,
-            font: { size: 9, color: '#94a3b8' }, yshift: -20, xanchor: 'right'
+            font: { size: 9, color: '#94a3b8' }, yshift: -25, xanchor: 'right'
         });
 
-        // Each region as a colored block on the contig
-        const regionColors = [
-            'rgba(37,99,235,0.25)', 'rgba(5,150,105,0.25)', 'rgba(124,58,237,0.25)',
-            'rgba(217,119,6,0.25)', 'rgba(13,148,136,0.25)', 'rgba(220,38,38,0.25)',
-        ];
-        const regionBorders = [
-            '#2563eb', '#059669', '#7c3aed',
-            '#d97706', '#0d9488', '#dc2626',
+        // Use consistent colors for all regions
+        const regionColor = 'rgba(37,99,235,0.25)';
+        const regionBorder = '#2563eb';
+
+        const primerTraces = [
+            { x: [], y: [], hoverinfo: 'skip', type: 'scatter', mode: 'markers', marker: { symbol: 'triangle-right', size: 10, color: '#059669', line: { color: 'white', width: 1 } }, showlegend: false },
+            { x: [], y: [], hoverinfo: 'skip', type: 'scatter', mode: 'markers', marker: { symbol: 'triangle-left', size: 10, color: '#dc2626', line: { color: 'white', width: 1 } }, showlegend: false }
         ];
 
         displayRegions.forEach((region, rIdx) => {
+            if (region.start === undefined || region.end === undefined) return;
             const rStart = region.start;
             const rEnd = region.end;
-            const colorIdx = rIdx % regionColors.length;
 
             // Region rectangle on the contig bar
             shapes.push({
                 type: 'rect',
                 x0: rStart, x1: rEnd,
                 y0: yBase - barH, y1: yBase + barH,
-                fillcolor: regionColors[colorIdx],
-                line: { color: regionBorders[colorIdx], width: 1.5 },
+                fillcolor: regionColor,
+                line: { color: regionBorder, width: 1.5 },
                 layer: 'above'
             });
 
-            // Region label
+            // Region label (R1, R2, ...) placed below the bar
             const midpoint = (rStart + rEnd) / 2;
             const regionLen = rEnd - rStart;
-            let tooltipText = `R${rIdx + 1} (${regionLen.toLocaleString()} bp)`;
+            let tooltipText = `Region ${rIdx + 1} (${regionLen.toLocaleString()} bp)`;
+            
+            let hasAnnotation = false;
+            let geneId = "";
             if (region.annotation && region.annotation !== "no annotation" && region.annotation !== "-" && region.annotation !== "no annotation (file not loaded)") {
-                tooltipText += `<br>Gene ID: ${region.annotation}`;
+                geneId = region.annotation;
+                tooltipText += `<br>Gene ID: ${geneId}`;
+                hasAnnotation = true;
             }
             
             annotations.push({
                 x: midpoint,
-                y: yBase,
+                y: yBase - barH - 0.2,
                 text: `R${rIdx + 1}`,
                 hovertext: tooltipText,
                 showarrow: false,
-                font: { size: 8, color: regionBorders[colorIdx], family: 'Inter' },
+                font: { size: 9, color: regionBorder, family: 'Inter', weight: 'bold' },
                 yshift: 0
             });
 
-            // Small marker for amplicon within region (if we have primer data)
-            // We use a thin colored line below the region bar to indicate primer positions
+            if (hasAnnotation) {
+                annotations.push({
+                    name: 'gene_annotation',
+                    x: midpoint,
+                    y: yBase + barH + 0.3,
+                    text: geneId,
+                    showarrow: false,
+                    font: { size: 9, color: '#64748b' },
+                    visible: document.getElementById('toggleAnnotations') ? document.getElementById('toggleAnnotations').checked : true
+                });
+            }
+
+            // Scatter markers for primers (if defined)
             if (region.primer_left_start !== undefined) {
-                // Primer left arrow
-                shapes.push({
-                    type: 'line',
-                    x0: rStart + (region.primer_left_start || 0),
-                    x1: rStart + (region.primer_left_start || 0) + (region.primer_left_len || 20),
-                    y0: yBase - barH - 0.12,
-                    y1: yBase - barH - 0.12,
-                    line: { color: '#059669', width: 3 }
-                });
-                // Primer right arrow
-                shapes.push({
-                    type: 'line',
-                    x0: rStart + (region.primer_right_start || regionLen - 20),
-                    x1: rStart + (region.primer_right_start || regionLen - 20) + (region.primer_right_len || 20),
-                    y0: yBase - barH - 0.12,
-                    y1: yBase - barH - 0.12,
-                    line: { color: '#dc2626', width: 3 }
-                });
+                primerTraces[0].x.push(rStart + region.primer_left_start);
+                primerTraces[0].y.push(yBase);
+                
+                const rightX = rStart + (region.primer_right_start || regionLen - 20) + (region.primer_right_len || 20);
+                primerTraces[1].x.push(rightX);
+                primerTraces[1].y.push(yBase);
             }
         });
 
-        // Build layout
-        Plotly.newPlot(plotId, [{
-            x: [null], y: [null], type: 'scatter', mode: 'none', showlegend: false
-        }], {
+        // Built layout data
+        Plotly.newPlot(plotId, [
+            { x: [null], y: [null], type: 'scatter', mode: 'none', showlegend: false },
+            primerTraces[0],
+            primerTraces[1]
+        ], {
             ...layoutBase,
             xaxis: {
                 title: 'Position (bp)',
@@ -1143,9 +1194,9 @@ Plotly.newPlot('plot-tmgc', [
     legendCard.innerHTML = `
         <div style="padding:1rem 1.5rem; display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center; font-size:0.8rem; color:var(--text-muted);">
             <span><span style="display:inline-block;width:14px;height:14px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Contig backbone</span>
-            <span><span style="display:inline-block;width:14px;height:14px;background:rgba(37,99,235,0.25);border:1px solid #2563eb;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Exclusive region</span>
-            <span><span style="display:inline-block;width:14px;height:4px;background:#059669;border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Forward primer</span>
-            <span><span style="display:inline-block;width:14px;height:4px;background:#dc2626;border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Reverse primer</span>
+            <span><span style="display:inline-block;width:14px;height:14px;background:rgba(37,99,235,0.25);border:1px solid #2563eb;border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Target Region (R1, R2...)</span>
+            <span><span style="display:inline-block;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid #059669;vertical-align:middle;margin-right:4px;"></span> Forward primer</span>
+            <span><span style="display:inline-block;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid #dc2626;vertical-align:middle;margin-right:4px;"></span> Reverse primer</span>
         </div>
     `;
     container.appendChild(legendCard);
