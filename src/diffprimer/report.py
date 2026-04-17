@@ -801,7 +801,7 @@ table.dataTable tbody tr:hover {{
     transition: max-height 0.4s ease;
 }}
 .params-body.open {{
-    max-height: 2000px;
+    max-height: none;
 }}
 .params-body-inner {{
     padding: 0 1.5rem 1.5rem;
