@@ -310,6 +310,20 @@ table.dataTable tbody tr {
 table.dataTable tbody tr:hover {
     background-color: rgba(37,99,235,0.03) !important;
 }
+.dt-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.dt-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
 .dt-search input {
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -317,6 +331,31 @@ table.dataTable tbody tr:hover {
     background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+}
+.custom-dt-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+.custom-dt-filter select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.custom-dt-filter select:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 .th-help {
     display: inline-flex;
@@ -624,7 +663,7 @@ table.dataTable tbody tr:hover {
 <th>Annotation <span class="th-help"  title="Overlapping genomic feature annotations from the GFF3 file.">?</span></th>
 <th>Specificity <span class="th-help"  title="Classification of primer specificity: Specific (low global similarity or positional mismatches) vs Non-Specific.">?</span></th>
 <th>Most Similar Target <span class="th-help"  title="Off-target sequence with the highest similarity to the amplicon region.">?</span></th>
-<th>Max Sim%</th>
+<th>Max Sim% <span class="th-help"  title="Percentage similarity of the amplicon region to the most similar off-target sequence.">?</span></th>
 
                 </tr></thead>
                 <tbody>
@@ -740,23 +779,34 @@ $(document).ready(function () {
         language: { search: "Filter:" },
         dom: '<"dt-top"lf>rt<"dt-bottom"ip>',
         initComplete: function () {
-            // Add specificity dropdown filter
-            this.api().columns().every(function () {
+            var api = this.api();
+            // Find the Specificity column
+            api.columns().every(function () {
                 var column = this;
                 var headerText = $(column.header()).text().trim().replace('?', '').trim();
                 
                 if (headerText === 'Specificity') {
-                    var select = $('<select style="margin-left:8px; padding:2px; border-radius:4px;"><option value="">All</option></select>')
-                        .appendTo($(column.header()))
+                    // Build filter widget and place it in the toolbar (next to search box)
+                    var wrapper = $('<div class="custom-dt-filter"></div>');
+                    var label = $('<span>Specificity:</span>');
+                    var select = $('<select><option value="">All</option></select>')
                         .on('change', function () {
                             var val = $.fn.dataTable.util.escapeRegex($(this).val());
                             column.search(val ? '^' + val + '$' : '', true, false).draw();
                         });
-                    // Extract exact values from HTML
-                    column.data().unique().sort().each(function (d, j) {
+                    // Populate unique values
+                    column.data().unique().sort().each(function (d) {
                         var textVal = $(d).text();
                         if (textVal) select.append('<option value="' + textVal + '">' + textVal + '</option>');
                     });
+                    wrapper.append(label).append(select);
+                    // Append to the search/filter toolbar area
+                    var searchContainer = $(api.table().container()).find('.dt-search');
+                    if (searchContainer.length) {
+                        searchContainer.append(wrapper);
+                    } else {
+                        $(api.table().container()).find('.dt-top').append(wrapper);
+                    }
                 }
             });
         }

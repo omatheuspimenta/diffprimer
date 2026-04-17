@@ -8,6 +8,7 @@ a searchable DataTable, genome browser visualization, and full parameter log.
 import os
 import re
 import json
+import html as html_mod
 import base64
 from pathlib import Path
 
@@ -101,6 +102,7 @@ COLUMN_TOOLTIPS = {
     "Specificity_Tag":     "Classification of primer specificity: Specific (low global similarity or positional mismatches) vs Non-Specific.",
     "Most_Similar_Target": "Off-target sequence with the highest similarity to the amplicon region.",
     "Max_Sim%":            "Percentage similarity of the amplicon region to the most similar off-target sequence.",
+    "Max Sim%":            "Percentage similarity of the amplicon region to the most similar off-target sequence.",
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -268,11 +270,13 @@ def generate_html_report(
 
     # Build rows HTML
     def _copy_cell(full_value, display_value, truncate=False):
+        fv_safe = html_mod.escape(str(full_value))
+        dv_safe = html_mod.escape(str(display_value))
         if truncate:
-            display_html = f'<span class="seq-cell" title="{full_value}">{display_value}</span>'
+            display_html = f'<span class="seq-cell" title="{fv_safe}">{dv_safe}</span>'
         else:
-            display_html = f'<span class="copy-text">{display_value}</span>'
-        fv_escaped = str(full_value).replace("'", "\\'")
+            display_html = f'<span class="copy-text">{dv_safe}</span>'
+        fv_escaped = str(full_value).replace("\\", "\\\\").replace("'", "\\'")
         icon = '<svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>'
         return f'<div class="flex-copy-cell">{display_html} <button class="copy-btn" onclick="copyText(this, \'{fv_escaped}\')" title="Copy">{icon}</button></div>'
 
@@ -643,36 +647,53 @@ table.dataTable tbody tr {{
 table.dataTable tbody tr:hover {{
     background-color: rgba(37,99,235,0.03) !important;
 }}
-.dt-search input {
+.dt-top {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}}
+.dt-search {{
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}}
+.dt-search input {{
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 12px;
     background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
-}
-.dt-search {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-}
-.custom-dt-filter {
+    font-size: 0.82rem;
+}}
+.custom-dt-filter {{
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     font-size: 0.82rem;
-}
-.custom-dt-filter select {
+    color: var(--text-muted);
+    font-weight: 500;
+}}
+.custom-dt-filter select {{
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 7px 10px;
+    padding: 8px 12px;
     background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     font-size: 0.82rem;
-    margin-left: 8px;
     cursor: pointer;
     outline: none;
-}
+    transition: border-color 0.2s;
+}}
+.custom-dt-filter select:focus {{
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}}
 .th-help {{
     display: inline-flex;
     align-items: center;
@@ -1076,23 +1097,34 @@ $(document).ready(function () {{
         language: {{ search: "Filter:" }},
         dom: '<"dt-top"lf>rt<"dt-bottom"ip>',
         initComplete: function () {{
-            // Add specificity dropdown filter
-            this.api().columns().every(function () {{
+            var api = this.api();
+            // Find the Specificity column
+            api.columns().every(function () {{
                 var column = this;
                 var headerText = $(column.header()).text().trim().replace('?', '').trim();
                 
                 if (headerText === 'Specificity') {{
-                    var select = $('<select style="margin-left:8px; padding:2px; border-radius:4px;"><option value="">All</option></select>')
-                        .appendTo($(column.header()))
+                    // Build filter widget and place it in the toolbar (next to search box)
+                    var wrapper = $('<div class="custom-dt-filter"></div>');
+                    var label = $('<span>Specificity:</span>');
+                    var select = $('<select><option value="">All</option></select>')
                         .on('change', function () {{
                             var val = $.fn.dataTable.util.escapeRegex($(this).val());
                             column.search(val ? '^' + val + '$' : '', true, false).draw();
                         }});
-                    // Extract exact values from HTML
-                    column.data().unique().sort().each(function (d, j) {{
+                    // Populate unique values
+                    column.data().unique().sort().each(function (d) {{
                         var textVal = $(d).text();
                         if (textVal) select.append('<option value="' + textVal + '">' + textVal + '</option>');
                     }});
+                    wrapper.append(label).append(select);
+                    // Append to the search/filter toolbar area
+                    var searchContainer = $(api.table().container()).find('.dt-search');
+                    if (searchContainer.length) {{
+                        searchContainer.append(wrapper);
+                    }} else {{
+                        $(api.table().container()).find('.dt-top').append(wrapper);
+                    }}
                 }}
             }});
         }}
