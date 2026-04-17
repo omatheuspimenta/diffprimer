@@ -175,12 +175,12 @@ def generate_html_report(
     left_gc  = df.get("Left_GC",  pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
     right_gc = df.get("Right_GC", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
 
-    left_hairpin = df.get("Left_HAIRPIN_TH",  pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
-    right_hairpin= df.get("Right_HAIRPIN_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
-    left_self    = df.get("Left_SELF_ANY_TH", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
-    right_self   = df.get("Right_SELF_ANY_TH",pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    left_hairpin = df.get("Left_HAIRPIN_TH",  pd.Series()).replace(["NA", "-"], pd.NA).dropna().astype(float).tolist()
+    right_hairpin= df.get("Right_HAIRPIN_TH", pd.Series()).replace(["NA", "-"], pd.NA).dropna().astype(float).tolist()
+    left_self    = df.get("Left_SELF_ANY_TH", pd.Series()).replace(["NA", "-"], pd.NA).dropna().astype(float).tolist()
+    right_self   = df.get("Right_SELF_ANY_TH",pd.Series()).replace(["NA", "-"], pd.NA).dropna().astype(float).tolist()
 
-    max_sim_pct = df.get("Max_Similarity_pct", pd.Series()).replace("NA", pd.NA).dropna().astype(float).tolist()
+    max_sim_pct = df.get("Max_Similarity_pct", pd.Series()).replace(["NA", "-"], pd.NA).dropna().astype(float).tolist()
 
     # ── Logo ──────────────────────────────────────────────────────────────
     logo_data_uri = _encode_logo_base64()
@@ -189,6 +189,40 @@ def generate_html_report(
     sw_version = version or __version__
 
     # ── Contig info for genome viz ────────────────────────────────────────
+    # Enrich contig_info with primer positions and annotations for the Genome Map
+    if contig_info:
+        for contig in contig_info:
+            for r in contig.get("regions", []):
+                # Match region by Sequence_ID and Start
+                c_head = contig.get("header")
+                r_start = str(r.get("start"))
+                match = table_df[(table_df["Sequence_ID"] == c_head) & (table_df["Start"].astype(str) == r_start)]
+                if not match.empty:
+                    row = match.iloc[0]
+                    # Parse gene ID for genome map tooltip
+                    ann_raw = str(row.get("Annotation", ""))
+                    gene_info = ann_raw
+                    for part in ann_raw.replace("|", ";").split(";"):
+                        if part.startswith("gene=") or part.startswith("gene_id=") or part.startswith("Name=") or part.startswith("ID="):
+                            gene_info = part.split("=")[1]
+                            break
+                    r["annotation"] = gene_info
+                    
+                    seq_reg = str(row.get("Sequence_Region", ""))
+                    forw_seq = str(row.get("Forw_Seq", ""))
+                    if forw_seq and forw_seq not in ("NA", "NaN") and forw_seq in seq_reg:
+                        idx = seq_reg.index(forw_seq)
+                        r["primer_left_start"] = idx
+                        r["primer_left_len"] = len(forw_seq)
+                        
+                        amp_s = str(row.get("Amplicon_Size", "0"))
+                        if amp_s.replace(".", "").isdigit():
+                            amp_size = int(float(amp_s))
+                            rev_seq = str(row.get("Rev_Seq", ""))
+                            if amp_size > 0 and rev_seq and rev_seq not in ("NA", "NaN"):
+                                r["primer_right_len"] = len(rev_seq)
+                                r["primer_right_start"] = idx + amp_size - len(rev_seq)
+
     contig_json = json.dumps(contig_info or [])
 
     # ── Specificity counts ────────────────────────────────────────────────
@@ -237,10 +271,10 @@ def generate_html_report(
         if truncate:
             display_html = f'<span class="seq-cell" title="{full_value}">{display_value}</span>'
         else:
-            display_html = f'<span>{display_value}</span>'
+            display_html = f'<span class="copy-text">{display_value}</span>'
         fv_escaped = str(full_value).replace("'", "\\'")
         icon = '<svg fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>'
-        return f"{display_html} <button class=\"copy-btn\" onclick=\"copyText(this, '{fv_escaped}')\" title=\"Copy\">{icon}</button>"
+        return f'<div class="flex-copy-cell">{display_html} <button class="copy-btn" onclick="copyText(this, \'{fv_escaped}\')" title="Copy">{icon}</button></div>'
 
     table_body_html = ""
     for _, row in table_df.iterrows():
@@ -256,6 +290,20 @@ def generate_html_report(
         cells = ""
         for col in display_columns:
             val = row.get(col, "")
+            if val == "NA":
+                val = "-"
+            
+            if col == "Annotation":
+                # Preprocess output for HTML text only
+                val_str = str(val)
+                if val_str not in ("-", "no annotation", "no annotation (file not loaded)"):
+                    gene_info = val_str
+                    for part in val_str.replace("|", ";").split(";"):
+                        if part.startswith("gene=") or part.startswith("gene_id=") or part.startswith("Name=") or part.startswith("ID="):
+                            gene_info = part.split("=")[1]
+                            break
+                    val = gene_info
+
             if col == "Specificity_Tag":
                 cells += f"<td>{tag_html}</td>"
             elif col in ("Forw_Seq", "Rev_Seq", "Amplicon_Seq", "Annotation", "Most_Similar_Target"):
@@ -595,14 +643,36 @@ table.dataTable tbody tr {{
 table.dataTable tbody tr:hover {{
     background-color: rgba(37,99,235,0.03) !important;
 }}
-.dt-search input {{
+.dt-search input {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 12px;
     background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
-}}
+}
+.dt-search {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+.custom-dt-filter {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.82rem;
+}
+.custom-dt-filter select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    margin-left: 8px;
+    cursor: pointer;
+    outline: none;
+}
 .th-help {{
     display: inline-flex;
     align-items: center;
@@ -622,14 +692,25 @@ table.dataTable tbody tr:hover {{
 .th-help:hover {{ opacity: 1; }}
 
 .seq-cell {{
-    font-family: 'Courier New', monospace;
+    font-family: 'Inter', sans-serif;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 140px;
     display: inline-block;
     vertical-align: middle;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
+}}
+.flex-copy-cell {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}}
+.copy-text {{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }}
 .copy-btn {{
     background: none;
@@ -727,6 +808,7 @@ table.dataTable tbody tr:hover {{
     padding: 7px 12px;
     border-bottom: 1px solid var(--border);
     color: var(--text);
+    word-break: break-all;
 }}
 .params-table tbody tr:hover {{
     background: rgba(37,99,235,0.03);
@@ -823,7 +905,11 @@ table.dataTable tbody tr:hover {{
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Specificity Breakdown</h2>
-                    <p>Proportion of primers classified by specificity analysis. <em>Specific</em> primers should amplify only the target region.</p>
+                    <p>Proportion of primers classified by specificity analysis.
+                    <br/><strong style="font-size:0.75rem;">Specific_HighSim</strong>: Unique seq, no homology.
+                    <strong style="font-size:0.75rem;">Specific_LowGlobalSim</strong>: No off-target hit above sim threshold.
+                    <strong style="font-size:0.75rem;">Specific_PositionalMismatches</strong>: Similarity found, but 3' mismatches prevent amplification.
+                    <strong style="font-size:0.75rem;">NonSpecific_Amplification</strong>: Will amplify an off-target sequence.</p>
                 </div>
                 <div class="chart-body"><div id="plot-specificity"></div></div>
             </div>
@@ -832,7 +918,7 @@ table.dataTable tbody tr:hover {{
             <div class="chart-card">
                 <div class="chart-header">
                     <h2>Off-Target Homology</h2>
-                    <p>Distribution of maximum percentage similarity between each amplicon region and the closest off-target sequence.</p>
+                    <p>Distribution of maximum percentage similarity between each amplicon region and the closest off-target sequence. Lower off-target homology percentages indicate that the selected amplicon is highly unique to the target region, reducing the chance of cross-reacting amplification in other parts of the genome.</p>
                 </div>
                 <div class="chart-body"><div id="plot-homology"></div></div>
             </div>
@@ -862,8 +948,15 @@ table.dataTable tbody tr:hover {{
 
     <!-- ─── Genome Map ─────────────────────────────────────────────── -->
     <section id="genome-map" class="mb-2">
-        <h2 class="section-title"><span class="icon">⊞</span> Genome Map</h2>
-        <div id="genome-viz-container"></div>
+        <div class="params-section">
+            <button class="params-toggle open" onclick="toggleParams(this, 'genomeVizBody')">
+                <span>⊞ Genome Map</span>
+                <span class="chevron">▾</span>
+            </button>
+            <div class="params-body open" id="genomeVizBody" style="padding: 1rem 1.5rem;">
+                <div id="genome-viz-container"></div>
+            </div>
+        </div>
     </section>
 
     <!-- ─── Data Table ─────────────────────────────────────────────── -->
@@ -884,7 +977,7 @@ table.dataTable tbody tr:hover {{
     <!-- ─── Parameters ─────────────────────────────────────────────── -->
     <section id="parameters" class="mb-2">
         <div class="params-section">
-            <button class="params-toggle" onclick="toggleParams(this)">
+            <button class="params-toggle" onclick="toggleParams(this, 'paramsBody')">
                 <span>⚙ Run Parameters &amp; Software Information</span>
                 <span class="chevron">▾</span>
             </button>
@@ -928,10 +1021,23 @@ function copyText(button, text) {{
     }});
 }}
 
-function toggleParams(btn) {{
+function toggleParams(btn, bodyId) {{
     btn.classList.toggle('open');
-    document.getElementById('paramsBody').classList.toggle('open');
+    if (!bodyId) {{ bodyId = 'paramsBody'; }}
+    document.getElementById(bodyId).classList.toggle('open');
 }}
+
+// Map Plotly SVG markers to circles
+function roundPlotlyLegends() {{
+    document.querySelectorAll('g.legend path').forEach(path => {{
+        const d = path.getAttribute('d');
+        // Replace typical square path with a small circle path
+        if (d && d.includes('Z') && d.length > 5 && d.length < 50) {{
+            path.setAttribute('d', 'M 0,-4 A 4,4 0 1,1 0,4 A 4,4 0 1,1 0,-4 Z');
+        }}
+    }});
+}}
+setInterval(roundPlotlyLegends, 1000);
 
 // ── Navigation scroll spy ────────────────────────────────────────────
 const nav = document.getElementById('topNav');
@@ -964,11 +1070,32 @@ sections.forEach(s => observer.observe(s));
 
 // ── DataTable ────────────────────────────────────────────────────────
 $(document).ready(function () {{
-    $('#primerTable').DataTable({{
+    var table = $('#primerTable').DataTable({{
         pageLength: 25,
         scrollX: true,
         language: {{ search: "Filter:" }},
-        dom: '<"dt-top"lf>rt<"dt-bottom"ip>'
+        dom: '<"dt-top"lf>rt<"dt-bottom"ip>',
+        initComplete: function () {{
+            // Add specificity dropdown filter
+            this.api().columns().every(function () {{
+                var column = this;
+                var headerText = $(column.header()).text().trim().replace('?', '').trim();
+                
+                if (headerText === 'Specificity') {{
+                    var select = $('<select style="margin-left:8px; padding:2px; border-radius:4px;"><option value="">All</option></select>')
+                        .appendTo($(column.header()))
+                        .on('change', function () {{
+                            var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                            column.search(val ? '^' + val + '$' : '', true, false).draw();
+                        }});
+                    // Extract exact values from HTML
+                    column.data().unique().sort().each(function (d, j) {{
+                        var textVal = $(d).text();
+                        if (textVal) select.append('<option value="' + textVal + '">' + textVal + '</option>');
+                    }});
+                }}
+            }});
+        }}
     }});
 }});
 
@@ -1025,7 +1152,7 @@ Plotly.newPlot('plot-specificity', [{{
     marker: {{ colors: COLORS, line: {{ color: '#fff', width: 2 }} }},
     textinfo: 'percent',
     textposition: 'outside',
-    textfont: {{ size: 11 }},
+    textfont: {{ size: 14 }},
     hoverinfo: 'label+value+percent',
     pull: 0.02
 }}], {{
@@ -1141,10 +1268,13 @@ Plotly.newPlot('plot-tmgc', [
         return;
     }}
 
-    // Filter to only contigs with regions
-    const contigsWithRegions = contigData.filter(c => c.regions && c.regions.length > 0);
+    // Filter to only contigs with regions that have primers
+    const contigsWithRegions = contigData.map(c => {{
+        return {{...c, regions: (c.regions || []).filter(r => r.primer_left_start !== undefined)}};
+    }}).filter(c => c.regions && c.regions.length > 0);
+    
     if (contigsWithRegions.length === 0) {{
-        container.innerHTML = '<div class="chart-card" style="padding:2rem;text-align:center;color:var(--text-muted);">No exclusive regions found in any contig.</div>';
+        container.innerHTML = '<div class="chart-card" style="padding:2rem;text-align:center;color:var(--text-muted);">No primers designed for any exclusive regions.</div>';
         return;
     }}
 
@@ -1158,22 +1288,20 @@ Plotly.newPlot('plot-tmgc', [
         const regions = contig.regions || [];
         const nRegions = regions.length;
 
-        // Group primers by region for clean display
-        // We'll limit to max 10 regions per chart; if more, show summary
-        const MAX_REGIONS_PER_CHART = 15;
-        const showAll = nRegions <= MAX_REGIONS_PER_CHART;
-        const displayRegions = showAll ? regions : regions.slice(0, MAX_REGIONS_PER_CHART);
+        // We display all regions
+        const showAll = true;
+        const displayRegions = regions;
 
         const headerHtml = `
             <div class="chart-header">
                 <h2>${{contig.header}}</h2>
-                <p>${{nRegions}} exclusive region(s) &bull; Contig length: ${{contigLen.toLocaleString()}} bp
-                ${{!showAll ? '<br><em style="color:var(--warning);">Showing first ' + MAX_REGIONS_PER_CHART + ' of ' + nRegions + ' regions.</em>' : ''}}</p>
+                <p>${{nRegions}} region(s) with primers &bull; Contig length: ${{contigLen.toLocaleString()}} bp</p>
             </div>
         `;
 
         const plotId = `genome-plot-${{cIdx}}`;
-        card.innerHTML = headerHtml + `<div class="chart-body"><div id="${{plotId}}" style="height:${{Math.max(120, displayRegions.length * 35 + 70)}}px;"></div></div>`;
+        const heightPx = Math.max(120, displayRegions.length * 35 + 70);
+        card.innerHTML = headerHtml + `<div class="chart-body"><div id="${{plotId}}" style="height:${{heightPx}}px;"></div></div>`;
         container.appendChild(card);
 
         // Build Plotly shapes and annotations
@@ -1181,6 +1309,7 @@ Plotly.newPlot('plot-tmgc', [
         const annotations = [];
         const yBase = 0;
         const barH = 0.35;
+        const yRange = heightPx / 120; // keeps the bar exactly proportional to height in pixels!
 
         // Contig backbone
         shapes.push({{
@@ -1230,10 +1359,16 @@ Plotly.newPlot('plot-tmgc', [
             // Region label
             const midpoint = (rStart + rEnd) / 2;
             const regionLen = rEnd - rStart;
+            let tooltipText = `R${{rIdx + 1}} (${{regionLen.toLocaleString()}} bp)`;
+            if (region.annotation && region.annotation !== "no annotation" && region.annotation !== "-" && region.annotation !== "no annotation (file not loaded)") {{
+                tooltipText += `<br>Gene ID: ${{region.annotation}}`;
+            }}
+            
             annotations.push({{
                 x: midpoint,
                 y: yBase,
-                text: `R${{rIdx + 1}} (${{regionLen.toLocaleString()}} bp)`,
+                text: `R${{rIdx + 1}}`,
+                hovertext: tooltipText,
                 showarrow: false,
                 font: {{ size: 8, color: regionBorders[colorIdx], family: 'Inter' }},
                 yshift: 0
@@ -1276,7 +1411,7 @@ Plotly.newPlot('plot-tmgc', [
                 tickformat: ',d'
             }},
             yaxis: {{
-                range: [-1, 1],
+                range: [-yRange, yRange],
                 showticklabels: false,
                 showgrid: false,
                 zeroline: false

@@ -307,23 +307,23 @@ def main(
         for item in designed_primers_list:
             header = item["header"]
             tag = "Not_Checked"
-            target = "NA"
-            sim = "NA"
-            l_penalty = "NA"
-            r_penalty = "NA"
+            target = "-"
+            sim = "-"
+            l_penalty = "-"
+            r_penalty = "-"
             if header in spec_map:
                 res = spec_map[header]
                 tag = str(res.tag)
-                target = res.most_similar_target if res.most_similar_target else "None"
+                target = res.most_similar_target if res.most_similar_target else "-"
                 if tag == "Specific_LowGlobalSim":
                     # No off-target hit above similarity threshold — no local analysis performed
-                    sim = "NA"
-                    l_penalty = "NA"
-                    r_penalty = "NA"
+                    sim = "-"
+                    l_penalty = "-"
+                    r_penalty = "-"
                 else:
                     sim = f"{res.max_similarity:.2f}"
-                    l_penalty = f"{res.left_primer_penalty:.1f}" if res.left_primer_penalty >= 0 else "NA"
-                    r_penalty = f"{res.right_primer_penalty:.1f}" if res.right_primer_penalty >= 0 else "NA"
+                    l_penalty = f"{res.left_primer_penalty:.1f}" if res.left_primer_penalty >= 0 else "-"
+                    r_penalty = f"{res.right_primer_penalty:.1f}" if res.right_primer_penalty >= 0 else "-"
 
             write_csv(
                 result_dict=item["result_dict"],
