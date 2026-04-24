@@ -7,12 +7,12 @@ import logging
 from rich.logging import RichHandler
 from rich.progress import (
     BarColumn,
+    MofNCompleteColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
-    MofNCompleteColumn,
     TransferSpeedColumn,
 )
 

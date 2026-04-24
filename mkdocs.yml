@@ -66,4 +66,5 @@ nav:
   - Home: index.md
   - How to Use: how-to-use.md
   - Algorithm Description and Mathematical Formulation: math.md
+  - Report Example: report_example.html
   - API Reference: api.md

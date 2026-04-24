@@ -104,6 +104,7 @@ dependencies = [
     { name = "gffpandas" },
     { name = "pandas" },
     { name = "primer3-py" },
+    { name = "pyfiglet" },
     { name = "rich" },
     { name = "typer" },
 ]
@@ -123,6 +124,7 @@ requires-dist = [
     { name = "gffpandas", specifier = ">=1.2.0" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "primer3-py", specifier = ">=2.3.0" },
+    { name = "pyfiglet", specifier = ">=1.0.4" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "typer", specifier = ">=0.20.0" },
 ]
@@ -603,6 +605,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/90/21/1e1e3053e4c340d435edc51f8114ef045db5915213ae483f7231f752ad5d/primer3_py-2.3.0-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:5d49b86910b78ad720dadc8ca1da3430cc611fd480ec33450ed9972723b4591f", size = 1363790, upload-time = "2026-01-06T16:13:55.336Z" },
     { url = "https://files.pythonhosted.org/packages/eb/4d/7e39ebaa1e4b429c152a1a9495a37f4605071faa6c715b641bf1565fb89f/primer3_py-2.3.0-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:aa22e24762916c7809a862bdd6857a658b83d2590774d855c24827316148bb7e", size = 3162410, upload-time = "2026-01-06T16:13:56.545Z" },
     { url = "https://files.pythonhosted.org/packages/71/74/6f8a9d478916a6f5021c9aed2569c5dbca9110f6fec4445977495aa93683/primer3_py-2.3.0-cp314-cp314t-win_amd64.whl", hash = "sha256:1d20e6630cc6928b2d4bca1ec9b822019683fcfebb6bcb00d72a150ad3d8af30", size = 1641112, upload-time = "2026-01-06T16:13:58.117Z" },
+]
+
+[[package]]
+name = "pyfiglet"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/e3/0a86276ad2c383ce08d76110a8eec2fe22e7051c4b8ba3fa163a0b08c428/pyfiglet-1.0.4.tar.gz", hash = "sha256:db9c9940ed1bf3048deff534ed52ff2dafbbc2cd7610b17bb5eca1df6d4278ef", size = 1560615, upload-time = "2025-08-15T18:32:47.302Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/5c/fe9f95abd5eaedfa69f31e450f7e2768bef121dbdf25bcddee2cd3087a16/pyfiglet-1.0.4-py3-none-any.whl", hash = "sha256:65b57b7a8e1dff8a67dc8e940a117238661d5e14c3e49121032bd404d9b2b39f", size = 1806118, upload-time = "2025-08-15T18:32:45.556Z" },
 ]
 
 [[package]]

@@ -1,7 +1,6 @@
-import pytest
-import os
 import sys
-from pathlib import Path
+
+import pytest
 
 # Ensure we can import the package
 # This assumes the package is installed in the environment or available via source

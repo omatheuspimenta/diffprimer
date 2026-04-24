@@ -73,12 +73,12 @@ uv pip install --force-reinstall .
 
 ## Usage
 
-The main command is `run`. This executes the full pipeline: finding unique regions -> designing primers -> verifying specificity.
+Running `diffprimer` executes the full pipeline: finding unique regions -> designing primers -> verifying specificity.
 
 ### Basic Command
 
 ```bash
-diffprimer run \
+diffprimer \
     --reference-file reference.fasta \
     --sequences-path genomes_directory/ \
 ```
@@ -86,7 +86,7 @@ diffprimer run \
 ### Complete Example
 
 ```bash
-diffprimer run \
+diffprimer \
     --reference-file data/target_species.fasta \
     --sequences-path data/background_species/ \
     --annotation-path data/target_annotations.gff3 \
@@ -109,7 +109,8 @@ diffprimer run \
 | `--min-region-length` | `-m` | Minimum length of unique regions to keep (Default: 200 bp). |
 | `--check-specificity` | | **Highly Recommended.** Enables the rigorous cryptographic check of primer specificity. Without this, primers are only designed on unique regions but not physically verified against off-targets. |
 | `--similarity-threshold` | | Global similarity threshold (%) for off-target flagging (Default: 80.0). |
-| `--local-mismatch-threshold` | | Positional mismatch score threshold for the local specificity check. Standard mismatches add 1, 3' end mismatches add 3. Default is 7, allowing up to 2 mismatches in the 3' region to still be considered non-specific (capable of amplifying). |
+| `--local-mismatch-threshold` | | Positional mismatch score threshold for the local specificity check. Standard mismatches add 1, 3' end mismatches add 3 (configurable via `--penalty-array`). Default is 7, allowing up to 2 mismatches in the 3' region to still be considered non-specific (capable of amplifying). |
+| `--penalty-array` | | Penalty values for mismatches. Provide a comma-separated list of 6 values. The first value is the penalty outside the 3' region. The next 5 values are the penalties for the 5 nucleotides of the 3' region. (Default: 1,3,3,3,3,3) |
 
 ---
 

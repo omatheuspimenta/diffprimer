@@ -2,10 +2,12 @@
 Helper functions for primer design and annotation processing.
 """
 
-import primer3
-import pandas as pd
-import gffpandas.gffpandas as gffpd
 import os
+
+import gffpandas.gffpandas as gffpd
+import pandas as pd
+import primer3
+
 from diffprimer.logs import diffprimerLog
 
 logger = diffprimerLog()

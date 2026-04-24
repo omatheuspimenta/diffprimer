@@ -1,50 +1,26 @@
-from diffprimer import __version__
-from diffprimer.main import main as _main
-from rich.console import Console
-from typer import Context, Exit, Option, Typer
 from typing import Annotated
+
+from rich.console import Console
+from rich.text import Text
+from typer import Exit, Option, Typer
+
+from diffprimer import __version__
 
 app = Typer(rich_markup_mode="rich")
 console = Console()
 
 
-def show_version(flag) -> None:
-    """
-    Show the application version and exit.
-
-    Args:
-        flag (bool): The flag value. If True, prints the version and exits.
-    """
+def show_version(flag: bool) -> None:
     if flag:
-        print(f"diffprimer version: {__version__}")
+        console.print(
+            Text("diffprimer version: ", style="bold cyan")
+            + Text(__version__, style="bold green")
+        )
         raise Exit(code=0)
 
 
-@app.callback(invoke_without_command=True)
+@app.command(epilog=f"diffprimer version: v{__version__}")
 def main(
-    ctx: Context,
-    version: Annotated[
-        bool,
-        Option(
-            "--version",
-            "-v",
-            help="Show the version and exit.",
-            is_eager=True,
-            callback=show_version,
-        ),
-    ] = False,
-):
-    """
-    Welcome to diffprimer!
-    """
-    # Only print the welcome message if NO subcommand is being run
-    if ctx.invoked_subcommand is None:
-        message = f"Welcome to diffprimer! Use --help to see available commands.\nVersion: {__version__}"
-        console.print(f"[bold blue]{message}[/bold blue]")
-
-
-@app.command(rich_help_panel="diffprimer main command")
-def run(
     reference_file: Annotated[
         str,
         Option(
@@ -197,13 +173,37 @@ def run(
             "--local-mismatch-threshold",
             help=(
                 "Local mismatch score threshold for primer binding.\n\n"
-                "Mismatches in the 5' end add 1 to the score, while 3' end mismatches add 3. "
+                "Mismatches in the 5' end add the penalty to the score, while 3' end mismatches add the penalty from the penalty array. "
                 "A score below this threshold means the primer is considered to bind (non-specific hit). "
-                "The default is 7, which allows up to 2 mismatches in the 3' region."
+                "The default is 7, which allows up to 2 mismatches in the 3' region, using default penalty values."
             ),
             rich_help_panel="Configuration",
         ),
     ] = 7,
+    penalty_array: Annotated[
+        str,
+        Option(
+            "--penalty",
+            help=(
+                "Penalty values for mismatches. Provide a comma-separated list of 6 values. "
+                "The first value is the penalty outside the 3' region. "
+                "The next 5 values are the penalties for the 5 nucleotides of the 3' region. "
+                "Default: '1,3,3,3,3,3'."
+            ),
+            rich_help_panel="Configuration",
+        ),
+    ] = "1,3,3,3,3,3",
+    version: Annotated[
+        bool,
+        Option(
+            "--version",
+            "-v",
+            help="Show the version and exit.",
+            is_eager=True,
+            callback=show_version,
+            rich_help_panel="Configuration",
+        ),
+    ] = False,
 ) -> None:
     """
     Run the diffprimer analysis pipeline.
@@ -219,12 +219,12 @@ def run(
 
     Example usage:
 
-        diffprimer run \\
-            --reference-file reference.fasta \\
-            --sequences-path genomes/ \\
-            --annotation-path reference.gff3 \\
-            --config-file config.ini \\
-            --kmer-size 21 \\
+        diffprimer \
+            --reference-file reference.fasta \
+            --sequences-path genomes/ \
+            --annotation-path reference.gff3 \
+            --config-file config.ini \
+            --kmer-size 21 \
             --cpus 8
 
     All input files must be readable, and paths are resolved to absolute paths.
@@ -242,4 +242,5 @@ def run(
         check_specificity=check_specificity,
         similarity_threshold=similarity_threshold,
         local_mismatch_threshold=local_mismatch_threshold,
+        penalty_array=penalty_array,
     )

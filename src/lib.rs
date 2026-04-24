@@ -938,6 +938,7 @@ pub fn check_primer_specificity_candidates(
     target_sequences: &[(String, Vec<u8>)], // Placeholder for tuple type
     similarity_threshold: f64,
     local_mismatch_threshold: u32,
+    penalty_array: &[f64; 6],
 ) -> Vec<PrimerSpecificityResult> {
 
     println!(
@@ -1095,14 +1096,20 @@ pub fn check_primer_specificity_candidates(
                                 if in_primer {
                                     // Determine weight based on whether this position
                                     // falls in the 3' critical region of the primer.
-                                    let in_three_prime = if is_reverse {
-                                        // REV primer: 3' end is at low primer_pos
-                                        primer_pos < three_prime_size
+                                    let weight = if is_reverse {
+                                        if primer_pos < three_prime_size {
+                                            penalty_array[5 - primer_pos]
+                                        } else {
+                                            penalty_array[0]
+                                        }
                                     } else {
-                                        // FWD primer: 3' end is at high primer_pos
-                                        primer_pos >= primer_length - three_prime_size
+                                        if primer_pos + 5 >= primer_length {
+                                            let offset = 5 - (primer_length - primer_pos);
+                                            penalty_array[offset + 1]
+                                        } else {
+                                            penalty_array[0]
+                                        }
                                     };
-                                    let weight = if in_three_prime { 3.0 } else { 1.0 };
 
                                     match op {
                                         AlignmentOperation::Subst => {
@@ -1287,6 +1294,7 @@ fn check_specificity<'py>(
     similarity_threshold: f64,
     local_mismatch_threshold: u32,
     num_threads: usize,
+    penalty_array: Vec<f64>,
 ) -> PyResult<Bound<'py, pyo3::types::PyList>> {
     let sequences_dir = PathBuf::from(sequences_dir);
 
@@ -1307,12 +1315,20 @@ fn check_specificity<'py>(
             style(target_sequences.len()).bold().white()
         );
 
+        let mut fixed_penalty_array = [0.0; 6];
+        if penalty_array.len() == 6 {
+            fixed_penalty_array.copy_from_slice(&penalty_array);
+        } else {
+            fixed_penalty_array = [1.0, 3.0, 3.0, 3.0, 3.0, 3.0];
+        }
+
         // Run specificity check
         let results = check_primer_specificity_candidates(
             &candidates,
             &target_sequences,
             similarity_threshold,
             local_mismatch_threshold,
+            &fixed_penalty_array,
         );
 
         Ok::<_, std::io::Error>(results)

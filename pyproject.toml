@@ -11,6 +11,7 @@ dependencies = [
     "gffpandas>=1.2.0",
     "pandas>=2.3.3",
     "primer3-py>=2.3.0",
+    "pyfiglet>=1.0.4",
     "rich>=15.0.0",
     "typer>=0.20.0",
 ]

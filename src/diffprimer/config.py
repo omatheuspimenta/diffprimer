@@ -3,6 +3,7 @@ Configuration loader for DiffPrimer.
 """
 
 from configparser import ConfigParser
+
 from diffprimer.logs import diffprimerLog
 
 logger = diffprimerLog()

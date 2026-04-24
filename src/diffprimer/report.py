@@ -5,14 +5,15 @@ Produces a standalone, interactive HTML report with Plotly.js charts,
 a searchable DataTable, genome browser visualization, and full parameter log.
 """
 
+import base64
+import html as html_mod
+import json
 import os
 import re
-import json
-import html as html_mod
-import base64
 from pathlib import Path
 
 import pandas as pd
+
 from diffprimer import __version__
 from diffprimer.logs import diffprimerLog
 

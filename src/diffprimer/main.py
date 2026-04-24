@@ -1,19 +1,23 @@
-from diffprimer.kmer_extractor import process_seqs, PrimerCandidate
-from diffprimer.config import load_config
-from diffprimer.helpers import write_csv, get_primers, write_csv_header, annotation_dataframe, get_sequence_intersection
-from diffprimer.logs import diffprimerLog, _make_progress
-from diffprimer.report import generate_html_report
-import os
 import multiprocessing
-from functools import partial
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.columns import Columns
-from rich import box
-
-
+import os
 import warnings
+from functools import partial
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+from diffprimer.config import load_config
+from diffprimer.helpers import (
+    annotation_dataframe,
+    get_primers,
+    write_csv,
+    write_csv_header,
+)
+from diffprimer.kmer_extractor import PrimerCandidate, process_seqs
+from diffprimer.logs import _make_progress, diffprimerLog
+from diffprimer.report import generate_html_report
 
 # Suppress harmless RuntimeWarning from PyO3/Python 3.14+ free-threading compatibility checks
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*global interpreter lock.*")
@@ -72,6 +76,7 @@ def main(
     check_specificity: bool = False,
     similarity_threshold: float = 80.0,
     local_mismatch_threshold: int = 7,
+    penalty_array: str = "1,3,3,3,3,3",
 ) -> None:
     """
     Main execution logic for the diffprimer pipeline.
@@ -90,6 +95,7 @@ def main(
         check_specificity (bool): Whether to perform specificity checks on designed primers.
         similarity_threshold (float): Threshold (%) for specificity checks.
         local_mismatch_threshold (int): Weight score threshold allowing mismatches in primer ends.
+        penalty_array (str): Comma-separated list of 6 floats representing the mismatch penalties.
     """    
     input_table = Table(show_header=False, box=None, padding=(0, 2))
     input_table.add_column("Parameter", style="bold cyan")
@@ -107,6 +113,7 @@ def main(
     if check_specificity:
         input_table.add_row("Similarity Threshold", str(similarity_threshold))
         input_table.add_row("Local Mismatch Thresh", str(local_mismatch_threshold))
+        input_table.add_row("Penalty Array", penalty_array)
 
     console.print(Panel(
         input_table, 
@@ -279,13 +286,23 @@ def main(
         sim_threshold = similarity_threshold 
         
         try:
-            from diffprimer.kmer_extractor import check_specificity as _check_specificity
+            penalty_weights = [float(x.strip()) for x in penalty_array.split(',')]
+            if len(penalty_weights) != 6:
+                raise ValueError
+        except Exception:
+            raise ValueError("--penalty-array must be a comma-separated list of exactly 6 numbers.")
+        
+        try:
+            from diffprimer.kmer_extractor import (
+                check_specificity as _check_specificity,
+            )
             specificity_results = _check_specificity(
                 candidates=candidates,
                 sequences_dir=sequences_path,
                 similarity_threshold=sim_threshold,
                 local_mismatch_threshold=local_mismatch_threshold,
-                num_threads=cpus
+                num_threads=cpus,
+                penalty_array=penalty_weights,
             )
             
             # Create lookup map
@@ -358,6 +375,7 @@ def main(
     if check_specificity:
         run_params["Similarity Threshold"] = str(similarity_threshold)
         run_params["Local Mismatch Threshold"] = str(local_mismatch_threshold)
+        run_params["Penalty Array"] = str(penalty_array)
 
     generate_html_report(
         results_dir=results_dir,
