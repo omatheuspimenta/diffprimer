@@ -1,8 +1,9 @@
 [project]
 name = "diffprimer"
-version = "0.1.2"
+version = "0.1.3"
 description = "A tool to design primers that target specific variants in genomic sequences. Alingment-free and fast."
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "Matheus Pimenta", email = "omatheuspimenta@outlook.com" }
 ]
