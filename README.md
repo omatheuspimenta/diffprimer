@@ -20,19 +20,43 @@ It combines high-performance k-mer analysis (written in Rust) with standard prim
 
 ## Installation
 
-### Prerequisites
+### Quick install (recommended)
 
--   **Operating System**: Linux (Recommended) or macOS.
--   **Python**: Version **3.13** or higher (Strict requirement).
--   **Rust**: Required to build the core engine. Install via [rustup](https://rustup.rs/).
+We recommend using `uv` to install `diffprimer` because it is incredibly fast and automatically handles virtual environments for you.
 
-### Quick Install (Recommended)
+*(If you don't have `uv` installed, it takes only a few seconds. Follow the [official uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).)*
 
-We recommend using [`uv`](https://github.com/astral-sh/uv) or `pip` in a clean environment.
+```bash
+uv tool install diffprimer
+```
+
+### Alternative methods
+
+If you prefer `pipx`, you can also use it to install `diffprimer` safely in an isolated environment.
+*(If you don't have `pipx` installed, follow the [official pipx installation guide](https://pipx.pypa.io/stable/installation/).)*
+
+```bash
+pipx install diffprimer
+```
+
+Or, using standard `pip`:
+
+```bash
+pip install diffprimer
+```
+
+### Requirements
+
+* Python 3.13 or newer
+* Rust is **NOT** required for end users
+
+### Development install
+
+If you want to contribute or build from source:
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/diffprimer.git
+    git clone https://github.com/omatheuspimenta/diffprimer.git
     cd diffprimer
     ```
 
@@ -49,25 +73,12 @@ We recommend using [`uv`](https://github.com/astral-sh/uv) or `pip` in a clean e
 
 3.  **Install**:
     ```bash
-    uv pip install .
+    uv pip install -e .
     # OR
-    pip install .
+    pip install -e .
     ```
 
-### Troubleshooting (Conda/Anaconda Users)
-
-If you are working inside a Conda environment, the system linker may conflict with Rust, causing build errors (e.g., `undefined symbol: getauxval`). To fix this:
-
-1.  **Deactivate Conda** completely for the build step.
-2.  Use the system's standard PATH.
-
-```bash
-# In your terminal
-unset CONDA_PREFIX
-export PATH=/usr/local/bin:/usr/bin:/bin:$HOME/.cargo/bin
-source .venv/bin/activate
-uv pip install --force-reinstall .
-```
+    *Note: Rust is required to build the core engine from source. Install via [rustup](https://rustup.rs/).*
 
 ---
 

@@ -29,14 +29,65 @@ The DiffPrimer computational workflow operates in three distinct phases:
 
 ## Installation
 
-DiffPrimer is distributed as a Python package. We strongly recommend installing it within an isolated environment using standard package managers such as `pip` or [`uv`](https://github.com/astral-sh/uv).
+### Quick install (recommended)
+
+We recommend using `uv` to install `diffprimer` because it is incredibly fast and automatically handles virtual environments for you.
+
+*(If you don't have `uv` installed, it takes only a few seconds. Follow the [official uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).)*
 
 ```bash
-# Standard installation via pip
+uv tool install diffprimer
+```
+
+### Alternative methods
+
+If you prefer `pipx`, you can also use it to install `diffprimer` safely in an isolated environment.
+*(If you don't have `pipx` installed, follow the [official pipx installation guide](https://pipx.pypa.io/stable/installation/).)*
+
+```bash
+pipx install diffprimer
+```
+
+Or, using standard `pip`:
+
+```bash
 pip install diffprimer
 ```
 
-For advanced installation guidelines, environment configuration, and troubleshooting, please refer to the main repository [README](https://github.com/omatheuspimenta/diffprimer).
+### Requirements
+
+* Python 3.13 or newer
+* Rust is **NOT** required for end users
+
+### Development install
+
+If you want to contribute or build from source:
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/omatheuspimenta/diffprimer.git
+    cd diffprimer
+    ```
+
+2.  **Create a Virtual Environment**:
+    ```bash
+    # Using uv (Recommended)
+    uv venv --python 3.13
+    source .venv/bin/activate
+    
+    # OR using standard python
+    python3.13 -m venv .venv
+    source .venv/bin/activate
+    ```
+
+3.  **Install**:
+    ```bash
+    uv pip install -e .
+    # OR
+    pip install -e .
+    ```
+
+    *Note: Rust is required to build the core engine from source. Install via [rustup](https://rustup.rs/).*
 
 ## Citation
 
