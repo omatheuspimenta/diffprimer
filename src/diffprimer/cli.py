@@ -5,6 +5,7 @@ from rich.text import Text
 from typer import Exit, Option, Typer
 
 from diffprimer import __version__
+from diffprimer.main import main as _main
 
 app = Typer(rich_markup_mode="rich")
 console = Console()
